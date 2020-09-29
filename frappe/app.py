@@ -207,6 +207,12 @@ def handle_exception(e):
 	if http_status_code >= 500:
 		make_error_snapshot(e)
 
+		try:
+			from sentry.utils import capture_exception
+			capture_exception()
+		except:
+			pass
+
 	if return_as_message:
 		response = frappe.website.render.render("message",
 			http_status_code=http_status_code)
@@ -266,3 +272,4 @@ def serve(port=8000, profile=False, no_reload=False, no_threading=False, site=No
 		use_debugger=not in_test_env,
 		use_evalex=not in_test_env,
 		threaded=not no_threading)
+
