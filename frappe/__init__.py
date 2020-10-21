@@ -1656,6 +1656,12 @@ def logger(module=None, with_more_info=False, allow_site=True, filter=None, max_
 def log_error(message=None, title=_("Error")):
 	'''Log error to Error Log'''
 
+	try:
+		from sentry.utils import capture_exception
+		capture_exception()
+	except:
+		pass
+
 	# AI ALERT:
 	# the title and message may be swapped
 	# the better API for this is log_error(title, message), and used in many cases this way
