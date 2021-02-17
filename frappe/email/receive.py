@@ -292,7 +292,8 @@ class EmailServer:
 			self.seen_status.update({uid: "UNSEEN"})
 
 	def has_login_limit_exceeded(self, e):
-		return "-ERR Exceeded the login limit" in strip(cstr(e))
+		error = getattr(e, "message", e)
+		return "-ERR Exceeded the login limit" in strip(cstr(error))
 
 	def _post_retrieve_cleanup(self, uid, msg_num):
 		with suppress(Exception):
