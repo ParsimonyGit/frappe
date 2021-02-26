@@ -48,6 +48,9 @@ def toggle_notifications(user, enable=False):
 	if frappe.db.exists("Notification Settings", user):
 		frappe.db.set_value("Notification Settings", user, 'enabled', enable)
 
+def enable_disable_notifications(user, enabled):
+	frappe.set_value("Notification Settings", user, 'enabled', enabled)
+
 
 @frappe.whitelist()
 def get_subscribed_documents():
