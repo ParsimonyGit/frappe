@@ -347,11 +347,11 @@ frappe.request.cleanup = function(opts, r) {
 		}
 
 		// show errors
-		if(r.exc) {
+		if (r.exc && frappe.boot.developer_mode) {
 			r.exc = JSON.parse(r.exc);
-			if(r.exc instanceof Array) {
-				$.each(r.exc, function(i, v) {
-					if(v) {
+			if (r.exc instanceof Array) {
+				$.each(r.exc, function (i, v) {
+					if (v) {
 						console.log(v);
 					}
 				})
@@ -429,9 +429,6 @@ frappe.request.report_error = function(xhr, request_opts) {
 			'<h5>Route</h5>',
 			'<pre>' + frappe.get_route_str() + '</pre>',
 			'<hr>',
-			'<h5>Error Report</h5>',
-			'<pre>' + exc + '</pre>',
-			'<hr>',
 			'<h5>Request Data</h5>',
 			'<pre>' + JSON.stringify(request_opts, null, "\t") + '</pre>',
 			'<hr>',
@@ -476,7 +473,6 @@ frappe.request.report_error = function(xhr, request_opts) {
 		}
 
 		let parts = strip(exc).split('\n');
-
 		frappe.error_dialog.$body.html(parts[parts.length - 1]);
 		frappe.error_dialog.show();
 
