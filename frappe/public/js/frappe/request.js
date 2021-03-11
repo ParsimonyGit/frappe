@@ -153,11 +153,6 @@ frappe.request.call = function(opts) {
 
 
 		},
-		508: function(xhr) {
-			frappe.utils.play_sound("error");
-			frappe.msgprint({title:__('Please try again'), indicator:'red',
-				message:__("Another transaction is blocking this one. Please try again in a few seconds.")});
-		},
 		413: function(data, xhr) {
 			frappe.msgprint({indicator:'red', title:__('File too big'), message:__("File size exceeded the maximum allowed size of {0} MB",
 				[(frappe.boot.max_file_size || 5242880) / 1048576])});
@@ -174,11 +169,7 @@ frappe.request.call = function(opts) {
 
 			opts.error_callback && opts.error_callback(r);
 		},
-		501: function(data, xhr) {
-			if(typeof data === "string") data = JSON.parse(data);
-			opts.error_callback && opts.error_callback(data, xhr.responseText);
-		},
-		500: function(xhr) {
+		500: function (xhr) {
 			frappe.utils.play_sound("error");
 			try {
 				opts.error_callback && opts.error_callback();
@@ -187,12 +178,23 @@ frappe.request.call = function(opts) {
 				frappe.request.report_error(xhr, opts);
 			}
 		},
+		501: function(data, xhr) {
+			if(typeof data === "string") data = JSON.parse(data);
+			opts.error_callback && opts.error_callback(data, xhr.responseText);
+		},
+		502: function (xhr) {
+			frappe.msgprint(__("Internal Server Error"));
+		},
 		504: function(xhr) {
 			frappe.msgprint(__("Request Timed Out"))
 			opts.error_callback && opts.error_callback();
 		},
-		502: function(xhr) {
-			frappe.msgprint(__("Internal Server Error"));
+		508: function (xhr) {
+			frappe.utils.play_sound("error");
+			frappe.msgprint({
+				title: __('Please try again'), indicator: 'red',
+				message: __("Another transaction is blocking this one. Please try again in a few seconds.")
+			});
 		}
 	};
 
@@ -346,20 +348,6 @@ frappe.request.cleanup = function(opts, r) {
 			}
 		}
 
-		// show errors
-		if (r.exc && frappe.boot.developer_mode) {
-			r.exc = JSON.parse(r.exc);
-			if (r.exc instanceof Array) {
-				$.each(r.exc, function (i, v) {
-					if (v) {
-						console.log(v);
-					}
-				})
-			} else {
-				console.log(r.exc);
-			}
-		}
-
 		// debug messages
 		if(r._debug_messages) {
 			if(opts.args) {
@@ -415,7 +403,7 @@ frappe.request.report_error = function(xhr, request_opts) {
 		}
 		delete data.exc;
 	} else {
-		exc = "";
+		exc = "An error occurred while trying to process the request. Please contact your administrator.";
 	}
 
 	var show_communication = function() {
