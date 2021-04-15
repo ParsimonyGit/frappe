@@ -1,4 +1,5 @@
 {
+ "allow_rename": 1,
  "beta": 1,
  "creation": "2019-01-24 15:51:06.362222",
  "doctype": "DocType",
@@ -94,7 +95,7 @@
   },
   {
    "fieldname": "authorization_uri",
-   "fieldtype": "Data",
+   "fieldtype": "Text",
    "label": "Authorization URI"
   },
   {
@@ -129,7 +130,7 @@
    "options": "Query Parameters"
   }
  ],
- "modified": "2021-04-12 06:44:26.499344",
+ "modified": "2021-04-15 08:15:16.690001",
  "modified_by": "Administrator",
  "module": "Integrations",
  "name": "Connected App",
