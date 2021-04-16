@@ -217,7 +217,7 @@ frappe.ui.form.ControlLink = frappe.ui.form.ControlData.extend({
 					me.awesomplete.list = me.$input.cache[doctype][term];
 				}
 			});
-		}, 500));
+		}, 10));
 
 		this.$input.on("blur", function() {
 			if(me.selected) {
@@ -478,4 +478,3 @@ if(Awesomplete) {
 		});
 	};
 }
-
