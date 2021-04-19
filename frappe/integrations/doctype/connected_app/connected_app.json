@@ -1,5 +1,6 @@
 {
  "allow_rename": 1,
+ "autoname": "field:provider_name",
  "beta": 1,
  "creation": "2019-01-24 15:51:06.362222",
  "doctype": "DocType",
@@ -33,7 +34,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Provider Name",
-   "reqd": 1
+   "reqd": 1,
+   "unique": 1
   },
   {
    "fieldname": "cb_00",
@@ -130,7 +132,7 @@
    "options": "Query Parameters"
   }
  ],
- "modified": "2021-04-15 08:15:16.690001",
+ "modified": "2021-04-19 09:07:36.101875",
  "modified_by": "Administrator",
  "module": "Integrations",
  "name": "Connected App",
