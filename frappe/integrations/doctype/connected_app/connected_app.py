@@ -3,7 +3,7 @@
 # For license information, please see license.txt
 
 import os
-from urllib.parse import urlencode, urljoin
+from urllib.parse import quote, urlencode, urljoin
 
 from requests_oauthlib import OAuth2Session
 
@@ -27,7 +27,7 @@ class ConnectedApp(Document):
 		base_url = get_url()
 		callback_path = (
 			"/api/method/frappe.integrations.doctype.connected_app.connected_app.callback/"
-			+ self.name
+			+ quote(self.name)
 		)
 		self.redirect_uri = urljoin(base_url, callback_path)
 
@@ -134,7 +134,7 @@ def callback(*args, **kwargs):
 	query_params = connected_app.get_query_params()
 	token = oauth_session.fetch_token(
 		connected_app.token_uri,
-		code=kwargs.get("code"),
+		code=kwargs.get("code") or kwargs.get("spapi_oauth_code"),
 		client_secret=connected_app.get_password("client_secret"),
 		include_client_id=True,
 		**query_params
