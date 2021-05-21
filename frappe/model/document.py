@@ -1391,6 +1391,3 @@ def execute_action(doctype, name, action, **kwargs):
 
 		doc.add_comment('Comment', _('Action Failed') + '<br><br>' + msg)
 		doc.notify_update()
-
-
-
