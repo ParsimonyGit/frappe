@@ -628,12 +628,13 @@ def set_config(context, key, value, global_ = False, as_dict=False):
 		common_site_config_path = os.path.join(sites_path, 'common_site_config.json')
 		update_site_config(key, value, validate = False, site_config_path = common_site_config_path)
 	else:
+		if not context.sites:
+			raise SiteNotSpecifiedError
+
 		for site in context.sites:
 			frappe.init(site=site)
 			update_site_config(key, value, validate=False)
 			frappe.destroy()
-		else:
-			raise SiteNotSpecifiedError
 
 @click.command('version')
 def get_version():
