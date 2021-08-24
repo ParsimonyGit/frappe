@@ -244,6 +244,12 @@ def handle_exception(e):
 			frappe.local.login_manager.clear_cookies()
 
 	if http_status_code >= 500:
+		try:
+			from sentry.utils import capture_exception
+			capture_exception()
+		except:
+			pass
+
 		frappe.logger().error('Request Error', exc_info=True)
 		make_error_snapshot(e)
 
