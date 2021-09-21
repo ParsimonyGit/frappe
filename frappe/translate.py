@@ -552,6 +552,7 @@ def extract_messages_from_code(code, is_py=False):
 
 	:param code: code from which translatable files are to be extracted
 	:param is_py: include messages in triple quotes e.g. `_('''message''')`"""
+	from jinja2 import TemplateError
 	try:
 		code = frappe.as_unicode(render_include(code))
 	except (TemplateError, ImportError, InvalidIncludePath, IOError):
@@ -765,7 +766,10 @@ def update_translations_for_source(source=None, translation_dict=None):
 		return
 
 	translation_dict = json.loads(translation_dict)
-
+	
+	if is_html(source):
+		source = strip_html_tags(source)
+	
 	# for existing records
 	translation_records = frappe.db.get_values('Translation', { 'source_name': source }, ['name', 'language'],  as_dict=1)
 	for d in translation_records:
