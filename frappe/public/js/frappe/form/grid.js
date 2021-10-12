@@ -134,9 +134,10 @@ export default class Grid {
 	}
 
 	setup_check() {
+		var me = this;
 
-		this.wrapper.on('click', '.grid-row-check', (e) => {
-			var $check = $(e.currentTarget);
+		this.wrapper.on('click', '.grid-row-check', function (e) {
+			var $check = $(this);
 			if ($check.parents('.grid-heading-row:first').length !== 0) {
 				// select all?
 				var checked = $check.prop('checked');
@@ -144,19 +145,17 @@ export default class Grid {
 					.find('.grid-row-check').prop('checked', checked);
 
 				// set all
-				let result_length = this.grid_pagination.get_result_length();
-				let page_index = this.grid_pagination.page_index;
-				let page_length = this.grid_pagination.page_length;
-				for (var ri = (page_index-1)*page_length; ri < result_length; ri++) {
-					this.grid_rows[ri].doc.__checked = checked ? 1: 0;
-				}
+				(me.grid_rows || []).forEach(function (row) { row.doc.__checked = checked ? 1 : 0; });
 			} else {
 				var docname = $check.parents('.grid-row:first').attr('data-name');
-				this.grid_rows_by_docname[docname].select($check.prop('checked'));
+				me.grid_rows_by_docname[docname].select($check.prop('checked'));
 			}
-			this.refresh_remove_rows_button();
+			me.refresh_remove_rows_button();
 		});
 
+		this.remove_rows_button.on('click', function () {
+			me.delete_rows();
+		});
 	}
 
 	delete_rows() {
