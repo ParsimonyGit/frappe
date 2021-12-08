@@ -31,6 +31,7 @@ def handle_not_exist(fn):
 class Workspace:
 	def __init__(self, page_name, minimal=False):
 		self.page_name = page_name
+		self.extended_number_cards = []
 		self.extended_links = []
 		self.extended_charts = []
 		self.extended_shortcuts = []
@@ -57,6 +58,7 @@ class Workspace:
 		self.restricted_pages = frappe.cache().get_value("domain_restricted_pages") or build_domain_restriced_page_cache()
 
 	def is_page_allowed(self):
+		# TODO(dashboard): check which number cards are allowed
 		cards = self.doc.get_link_groups() + get_custom_reports_and_doctypes(self.doc.module) + self.extended_links
 		shortcuts = self.doc.shortcuts + self.extended_shortcuts
 
@@ -160,6 +162,7 @@ class Workspace:
 		pages = [frappe.get_cached_doc("Workspace", page['name']) for page in pages]
 
 		for page in pages:
+			self.extended_number_cards = self.extended_number_cards + page.number_cards
 			self.extended_links = self.extended_links + page.get_link_groups()
 			self.extended_charts = self.extended_charts + page.charts
 			self.extended_shortcuts = self.extended_shortcuts + page.shortcuts
@@ -184,6 +187,12 @@ class Workspace:
 		return False
 
 	def build_workspace(self):
+		self.number_cards = {
+			'label': _(self.doc.number_cards_label),
+			'items': self.get_number_cards(),
+			'doctype': 'Sales Order',
+		}
+
 		self.cards = {
 			'label': _(self.doc.cards_label),
 			'items': self.get_links()
@@ -244,6 +253,32 @@ class Workspace:
 		item["label"] = _(item.label) if item.label else _(item.name)
 
 		return item
+
+	@handle_not_exist
+	def get_number_cards(self):
+		all_number_cards = []
+		if frappe.has_permission("Number Card", throw=False):
+			number_cards = self.doc.number_cards
+			if len(self.extended_number_cards):
+				number_cards = number_cards + self.extended_number_cards
+
+			for number_card in number_cards:
+				if frappe.has_permission(
+					"Number Card", doc=number_card.number_card_name
+				):
+					number_card.document_type = frappe.db.get_value(
+						"Number Card", number_card.number_card_name, "document_type"
+					)
+					# Translate label
+					number_card.label = (
+						_(number_card.label)
+						if number_card.label
+						else _(number_card.number_card_name)
+					)
+
+					all_number_cards.append(number_card)
+
+		return all_number_cards
 
 	@handle_not_exist
 	def get_links(self):
@@ -363,6 +398,7 @@ def get_desktop_page(page):
 		wspace = Workspace(page)
 		wspace.build_workspace()
 		return {
+			'number_cards': wspace.number_cards,
 			'charts': wspace.charts,
 			'shortcuts': wspace.shortcuts,
 			'cards': wspace.cards,
@@ -510,6 +546,7 @@ def save_customization(page, config):
 		"category": original_page.category
 	})
 
+	# TODO(dashboard): handle number card customization
 	config = _dict(loads(config))
 	if config.charts:
 		page_doc.charts = prepare_widget(config.charts, "Workspace Chart", "charts")
@@ -583,9 +620,9 @@ def update_onboarding_step(name, field, value):
 	"""Update status of onboaridng step
 
 	Args:
-	    name (string): Name of the doc
-	    field (string): field to be updated
-	    value: Value to be updated
+		name (string): Name of the doc
+		field (string): field to be updated
+		value: Value to be updated
 
 	"""
 	frappe.db.set_value("Onboarding Step", name, field, value)
@@ -613,4 +650,3 @@ def merge_cards_based_on_label(cards):
 			cards_dict[label] = card
 
 	return list(cards_dict.values())
-

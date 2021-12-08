@@ -264,6 +264,7 @@ class DesktopPage {
 		}
 
 		this.data.onboarding && this.data.onboarding.items.length && this.make_onboarding();
+		this.make_number_cards();
 		this.make_charts();
 		this.make_shortcuts();
 		this.make_cards();
@@ -306,6 +307,7 @@ class DesktopPage {
 		frappe.dom.freeze();
 		const config = {};
 
+		if (this.sections.number_cards) config.number_cards = this.sections.number_cards.get_config();
 		if (this.sections.charts) config.charts = this.sections.charts.get_widget_config();
 		if (this.sections.shortcuts) config.shortcuts = this.sections.shortcuts.get_widget_config();
 		if (this.sections.cards) config.cards = this.sections.cards.get_widget_config();
@@ -355,6 +357,23 @@ class DesktopPage {
 		});
 	}
 
+	make_number_cards() {
+		this.sections["number_cards"] = new frappe.widget.WidgetGroup({
+			container: this.page,
+			type: "number_card",
+			columns: 3,
+			hidden: Boolean(this.onboarding_widget),
+			options: {
+				allow_sorting: true,
+				allow_create: true,
+				allow_delete: true,
+				allow_hiding: false,
+			},
+			widgets: this.data.number_cards.items,
+			default_values: { doctype: this.data.number_cards.doctype },
+		});
+	}
+
 	make_charts() {
 		this.sections["charts"] = new frappe.widget.WidgetGroup({
 			container: this.page,
@@ -368,7 +387,6 @@ class DesktopPage {
 				allow_delete: this.allow_customization,
 				allow_hiding: false,
 				allow_edit: true,
-				max_widget_count: 2,
 			},
 			widgets: this.data.charts.items
 		});
@@ -392,7 +410,7 @@ class DesktopPage {
 	}
 
 	make_cards() {
-		let cards = new frappe.widget.WidgetGroup({
+		this.sections["cards"] = new frappe.widget.WidgetGroup({
 			title: this.data.cards.label || __("Reports & Masters"),
 			container: this.page,
 			type: "links",
@@ -406,9 +424,5 @@ class DesktopPage {
 			},
 			widgets: this.data.cards.items
 		});
-
-		this.sections["cards"] = cards;
 	}
 }
-
-

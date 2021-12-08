@@ -24,6 +24,9 @@
   "pin_to_top",
   "pin_to_bottom",
   "hide_custom",
+  "sb_number_cards",
+  "number_cards_label",
+  "number_cards",
   "section_break_2",
   "charts_label",
   "charts",
@@ -209,16 +212,33 @@
    "options": "Workspace Link"
   },
   {
-    "default": "0",
-    "depends_on": "extends_another_page",
-    "description": "Sets the current page as default for all users",
-    "fieldname": "is_default",
-    "fieldtype": "Check",
-    "label": "Is Default"
-   }
+   "default": "0",
+   "depends_on": "extends_another_page",
+   "description": "Sets the current page as default for all users",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "label": "Is Default"
+  },
+  {
+   "fieldname": "sb_number_cards",
+   "fieldtype": "Section Break",
+   "label": "Number Cards"
+  },
+  {
+   "depends_on": "eval:!doc.extends_another_page || !doc.is_standard",
+   "fieldname": "number_cards_label",
+   "fieldtype": "Data",
+   "label": "Label"
+  },
+  {
+   "fieldname": "number_cards",
+   "fieldtype": "Table",
+   "label": "Number Cards",
+   "options": "Workspace Number Card"
+  }
  ],
  "links": [],
- "modified": "2021-01-21 12:09:36.156614",
+ "modified": "2021-12-08 04:38:53.687684",
  "modified_by": "Administrator",
  "module": "Desk",
  "name": "Workspace",

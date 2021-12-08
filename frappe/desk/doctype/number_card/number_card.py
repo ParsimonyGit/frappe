@@ -83,10 +83,10 @@ def get_result(doc, filters, to_date=None):
 	else:
 		fields = ['{function}({based_on}) as result'.format(function=function, based_on=doc.aggregate_function_based_on)]
 
-	filters = frappe.parse_json(filters)
-
 	if not filters:
 		filters = []
+	elif isinstance(filters, str):
+		filters = frappe.parse_json(filters)
 
 	if to_date:
 		filters.append([doc.document_type, 'creation', '<', to_date])
