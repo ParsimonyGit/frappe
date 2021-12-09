@@ -31,25 +31,26 @@ export default class NumberCardWidget extends Widget {
 	}
 
 	make_card() {
-		frappe.model.with_doc('Number Card', this.name).then(card => {
-			if (!card) {
-				if (this.document_type) {
-					frappe.run_serially([
-						() => this.create_number_card(),
-						() => this.render_card(),
-					]);
+		frappe.model.with_doc('Number Card', this.number_card_name || this.name)
+			.then(card => {
+				if (!card) {
+					if (this.document_type) {
+						frappe.run_serially([
+							() => this.create_number_card(),
+							() => this.render_card(),
+						]);
+					} else {
+						// widget doesn't exist so delete
+						this.delete(false);
+						return;
+					}
 				} else {
-					// widget doesn't exist so delete
-					this.delete(false);
-					return;
+					this.card_doc = card;
+					this.render_card();
 				}
-			} else {
-				this.card_doc = card;
-				this.render_card();
-			}
 
-			this.set_events();
-		});
+				this.set_events();
+			});
 	}
 
 	create_number_card() {

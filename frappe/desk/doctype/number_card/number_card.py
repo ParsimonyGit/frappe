@@ -159,6 +159,7 @@ def get_cards_for_user(doctype, txt, searchfield, start, page_len, filters):
 
 	search_conditions = 'and (' + search_conditions +')' if search_conditions else ''
 	conditions, values = frappe.db.build_conditions(filters)
+	conditions = conditions + " and " if conditions else ""
 	values['txt'] = '%' + txt + '%'
 
 	return frappe.db.sql(
@@ -167,7 +168,7 @@ def get_cards_for_user(doctype, txt, searchfield, start, page_len, filters):
 		from
 			`tabNumber Card`
 		where
-			{conditions} and
+			{conditions}
 			(`tabNumber Card`.owner = '{user}' or
 			`tabNumber Card`.is_public = 1)
 			{search_conditions}

@@ -190,7 +190,6 @@ class Workspace:
 		self.number_cards = {
 			'label': _(self.doc.number_cards_label),
 			'items': self.get_number_cards(),
-			'doctype': 'Sales Order',
 		}
 
 		self.cards = {
@@ -266,9 +265,6 @@ class Workspace:
 				if frappe.has_permission(
 					"Number Card", doc=number_card.number_card_name
 				):
-					number_card.document_type = frappe.db.get_value(
-						"Number Card", number_card.number_card_name, "document_type"
-					)
 					# Translate label
 					number_card.label = (
 						_(number_card.label)
