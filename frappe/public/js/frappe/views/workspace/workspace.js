@@ -307,7 +307,7 @@ class DesktopPage {
 		frappe.dom.freeze();
 		const config = {};
 
-		if (this.sections.number_cards) config.number_cards = this.sections.number_cards.get_config();
+		if (this.sections.number_cards) config.number_cards = this.sections.number_cards.get_widget_config();
 		if (this.sections.charts) config.charts = this.sections.charts.get_widget_config();
 		if (this.sections.shortcuts) config.shortcuts = this.sections.shortcuts.get_widget_config();
 		if (this.sections.cards) config.cards = this.sections.cards.get_widget_config();

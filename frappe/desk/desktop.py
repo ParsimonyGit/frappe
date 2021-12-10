@@ -58,7 +58,6 @@ class Workspace:
 		self.restricted_pages = frappe.cache().get_value("domain_restricted_pages") or build_domain_restriced_page_cache()
 
 	def is_page_allowed(self):
-		# TODO(dashboard): check which number cards are allowed
 		cards = self.doc.get_link_groups() + get_custom_reports_and_doctypes(self.doc.module) + self.extended_links
 		shortcuts = self.doc.shortcuts + self.extended_shortcuts
 
@@ -533,6 +532,7 @@ def save_customization(page, config):
 	# Update field values
 	page_doc.update({
 		"icon": original_page.icon,
+		"number_cards_label": original_page.number_cards_label,
 		"charts_label": original_page.charts_label,
 		"cards_label": original_page.cards_label,
 		"shortcuts_label": original_page.shortcuts_label,
@@ -542,8 +542,9 @@ def save_customization(page, config):
 		"category": original_page.category
 	})
 
-	# TODO(dashboard): handle number card customization
 	config = _dict(loads(config))
+	if config.number_cards:
+		page_doc.number_cards = prepare_widget(config.number_cards, "Workspace Number Card", "number_cards")
 	if config.charts:
 		page_doc.charts = prepare_widget(config.charts, "Workspace Chart", "charts")
 	if config.shortcuts:
