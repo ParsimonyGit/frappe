@@ -685,3 +685,17 @@ def trim_tables(doctype=None):
 			query = """alter table `tab{doctype}` {columns}""".format(
 				doctype=doctype, columns=columns_to_remove)
 			frappe.db.sql_ddl(query)
+
+
+@frappe.whitelist()
+def get_doctype_meta(doctype, only_fields_with_value=True):
+	doctype_meta = frappe.get_meta(doctype)
+	if only_fields_with_value:
+		doctype_fields = doctype_meta.get_fieldnames_with_value(with_field_meta=True)
+	else:
+		doctype_fields = doctype_meta.fields
+	if doctype_meta.is_nested_set():
+		doctype_fields = [
+			field for field in doctype_fields if field.fieldname not in ["lft", "rgt"]
+		]
+	return doctype_fields
