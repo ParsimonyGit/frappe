@@ -209,7 +209,7 @@ class MariaDBDatabase(Database):
 				published int(1) not null default 0,
 				unique `doctype_name` (doctype, name))
 				COLLATE=utf8mb4_unicode_ci
-				ENGINE=MyISAM
+				ENGINE=InnoDB
 				CHARACTER SET=utf8mb4'''.format(self.VARCHAR_LEN))
 
 	def create_user_settings_table(self):
@@ -231,7 +231,7 @@ class MariaDBDatabase(Database):
 				fulltext(content),
 				index (path))
 				COLLATE=utf8mb4_unicode_ci
-				ENGINE=MyISAM
+				ENGINE=InnoDB
 				CHARACTER SET=utf8mb4''')
 
 	@staticmethod
