@@ -72,7 +72,7 @@ class MariaDBDatabase(Database):
 		})
 
 		conn = pymysql.connect(
-			user=self.user or '',
+			user=self.user + frappe.conf.get("database_instance_name", ""),
 			password=self.password or '',
 			host=self.host,
 			port=self.port,
@@ -86,7 +86,9 @@ class MariaDBDatabase(Database):
 		# MYSQL_OPTION_MULTI_STATEMENTS_OFF = 1
 		# # self._conn.set_server_option(MYSQL_OPTION_MULTI_STATEMENTS_OFF)
 
-		if self.user != 'root':
+		root_login = frappe.conf.get("root_login") or 'root'
+
+		if self.user != root_login:
 			conn.select_db(self.user)
 
 		return conn

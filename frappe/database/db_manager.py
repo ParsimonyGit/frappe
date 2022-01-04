@@ -63,6 +63,7 @@ class DbManager:
 	def restore_database(target, source, user, password):
 		from frappe.utils import make_esc
 		esc = make_esc('$ ')
+		user = user + frappe.conf.get("database_instance_name", "")
 
 		from distutils.spawn import find_executable
 		pv = find_executable('pv')
