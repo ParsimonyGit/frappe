@@ -65,8 +65,8 @@ class TestGlobalSearch(unittest.TestCase):
 		event = frappe.get_doc('Event', frappe.get_all('Event')[0].name)
 		event.subject = test_subject
 		event.save()
-		frappe.db.commit()
 		global_search.sync_global_search()
+		frappe.db.commit()
 		results = global_search.search('testing global search')
 
 		self.assertTrue('testing global search' in results[0].content)
@@ -79,6 +79,7 @@ class TestGlobalSearch(unittest.TestCase):
 		from frappe.custom.doctype.property_setter.property_setter import make_property_setter
 		make_property_setter(doctype, "repeat_on", "in_global_search", 1, "Int")
 		global_search.rebuild_for_doctype(doctype)
+		frappe.db.commit()
 		results = global_search.search('Monthly')
 		self.assertEqual(len(results), 3)
 
