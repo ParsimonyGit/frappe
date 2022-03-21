@@ -1697,7 +1697,7 @@ def log_error(message=None, title=_("Error")):
 
 	try:
 		from sentry.utils import capture_exception
-		capture_exception()
+		capture_exception(message, title)
 	except:
 		pass
 
