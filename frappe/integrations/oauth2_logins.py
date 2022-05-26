@@ -8,9 +8,11 @@ import frappe.utils
 from frappe.utils.oauth import login_via_oauth2, login_via_oauth2_id_token
 
 
+
 @frappe.whitelist(allow_guest=True)
 def login_via_azure_b2c(code, state):
 	login_via_oauth2_id_token("azure_b2c", code, state, decoder=decoder_compat)
+
 
 
 @frappe.whitelist(allow_guest=True)
