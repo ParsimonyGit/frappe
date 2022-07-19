@@ -183,7 +183,9 @@ def set_cors_headers(response):
 			"Access-Control-Allow-Headers": (
 				"Authorization,DNT,X-Mx-ReqToken,"
 				"Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,"
-				"Cache-Control,Content-Type"
+				"Cache-Control,Content-Type",
+				# https://docs.sentry.io/platforms/javascript/performance/connect-services/
+				"baggage,sentry-trace"
 			),
 		}
 	)
