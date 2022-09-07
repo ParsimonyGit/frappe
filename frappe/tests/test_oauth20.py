@@ -1,11 +1,13 @@
 # Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
 # MIT License. See license.txt
+from __future__ import unicode_literals
 
 import unittest
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import quote, urlencode
 
 import jwt
 import requests
+from six.moves.urllib.parse import parse_qs, urljoin, urlparse
 
 import frappe
 from frappe.integrations.oauth2 import encode_params
@@ -16,9 +18,9 @@ class TestOAuth20(unittest.TestCase):
 	def setUp(self):
 		make_test_records("OAuth Client")
 		make_test_records("User")
-		self.client_id = frappe.get_all("OAuth Client", fields=["*"])[0].get(
-			"client_id"
-		)
+		client = frappe.get_all("OAuth Client", fields=["*"])[0]
+		self.client_id = client.get("client_id")
+		self.client_secret = client.get("client_secret")
 		self.form_header = {"content-type": "application/x-www-form-urlencoded"}
 		self.scope = "all openid"
 		self.redirect_uri = "http://localhost"
@@ -92,6 +94,9 @@ class TestOAuth20(unittest.TestCase):
 		self.assertTrue(bearer_token.get("token_type") == "Bearer")
 		self.assertTrue(check_valid_openid_response(bearer_token.get("access_token")))
 
+		decoded_token = self.decode_id_token(bearer_token.get("id_token"))
+		self.assertEqual(decoded_token["email"], "test@example.com")
+
 	def test_login_using_authorization_code_with_pkce(self):
 		update_client_for_auth_code_grant(self.client_id)
 
@@ -143,6 +148,9 @@ class TestOAuth20(unittest.TestCase):
 
 		self.assertTrue(bearer_token.get("access_token"))
 		self.assertTrue(bearer_token.get("id_token"))
+
+		decoded_token = self.decode_id_token(bearer_token.get("id_token"))
+		self.assertEqual(decoded_token["email"], "test@example.com")
 
 	def test_revoke_token(self):
 		client = frappe.get_doc("OAuth Client", self.client_id)
@@ -267,9 +275,7 @@ class TestOAuth20(unittest.TestCase):
 		self.assertTrue(response_dict.get("expires_in"))
 		self.assertTrue(response_dict.get("scope"))
 		self.assertTrue(response_dict.get("token_type"))
-		self.assertTrue(
-			check_valid_openid_response(response_dict.get("access_token")[0])
-		)
+		self.assertTrue(check_valid_openid_response(response_dict.get("access_token")[0]))
 
 	def test_openid_code_id_token(self):
 		client = update_client_for_auth_code_grant(self.client_id)
@@ -320,15 +326,18 @@ class TestOAuth20(unittest.TestCase):
 		# Parse bearer token json
 		bearer_token = token_response.json()
 
-		id_token = bearer_token.get("id_token")
-		payload = jwt.decode(
-			id_token,
-			audience=client.client_id,
-			key=client.client_secret,
-			algorithm="HS256",
-		)
+		payload = self.decode_id_token(bearer_token.get("id_token"))
+		self.assertEqual(payload["email"], "test@example.com")
 
 		self.assertTrue(payload.get("nonce") == nonce)
+
+	def decode_id_token(self, id_token):
+		return jwt.decode(
+			id_token,
+			audience=self.client_id,
+			key=self.client_secret,
+			algorithm="HS256",
+		)
 
 
 def check_valid_openid_response(access_token=None):
@@ -340,8 +349,7 @@ def check_valid_openid_response(access_token=None):
 
 	# check openid for email test@example.com
 	openid_response = requests.get(
-		get_full_url("/api/method/frappe.integrations.oauth2.openid_profile"),
-		headers=headers,
+		get_full_url("/api/method/frappe.integrations.oauth2.openid_profile"), headers=headers
 	)
 
 	return openid_response.status_code == 200
@@ -349,8 +357,7 @@ def check_valid_openid_response(access_token=None):
 
 def login(session):
 	session.post(
-		get_full_url("/api/method/login"),
-		data={"usr": "test@example.com", "pwd": "Eastern_43A1W"},
+		get_full_url("/api/method/login"), data={"usr": "test@example.com", "pwd": "Eastern_43A1W"}
 	)
 
 
