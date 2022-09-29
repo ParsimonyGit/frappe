@@ -1492,10 +1492,9 @@ fraction.js@^4.3.6:
   resolved "https://registry.yarnpkg.com/fraction.js/-/fraction.js-4.3.7.tgz#06ca0085157e42fda7f9e726e79fefc4068840f7"
   integrity sha512-ZsDfxO51wGAXREY55a7la9LScWpwv9RxIrYABrlvOFBlH/ShPnrtsXeuUIfXKKOVicNxQ+o8JTbJvjS4M89yew==
 
-frappe-charts@2.0.0-rc22:
-  version "2.0.0-rc22"
-  resolved "https://registry.yarnpkg.com/frappe-charts/-/frappe-charts-2.0.0-rc22.tgz#9a5a747febdc381a1d4d7af96e89cf519dfba8c0"
-  integrity sha512-N7f/8979wJCKjusOinaUYfMxB80YnfuVLrSkjpj4LtyqS0BGS6SuJxUnb7Jl4RWUFEIs7zEhideIKnyLeFZF4Q==
+"frappe-charts@https://github.com/ParsimonyGit/charts/tarball/v13":
+  version "2.0.0-rc13"
+  resolved "https://github.com/ParsimonyGit/charts/tarball/v13#d865920a836b509aa9c2f4aeee6ec779a4c80076"
 
 frappe-datatable@1.17.13:
   version "1.17.13"
