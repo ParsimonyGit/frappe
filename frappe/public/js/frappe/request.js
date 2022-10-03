@@ -205,15 +205,15 @@ frappe.request.call = function (opts) {
 				frappe.request.report_error(xhr, opts);
 			}
 		},
-		501: function(data, xhr) {
-			if(typeof data === "string") data = JSON.parse(data);
+		501: function (data, xhr) {
+			if (typeof data === "string") data = JSON.parse(data);
 			opts.error_callback && opts.error_callback(data, xhr.responseText);
 		},
 		502: function (xhr) {
 			frappe.msgprint(__("Internal Server Error"));
 		},
-		504: function(xhr) {
-			frappe.msgprint(__("Request Timed Out"))
+		504: function (xhr) {
+			frappe.msgprint(__("Request Timed Out"));
 			opts.error_callback && opts.error_callback();
 		},
 		508: function (xhr) {
@@ -510,7 +510,8 @@ frappe.request.report_error = function (xhr, request_opts) {
 		}
 		delete data.exc;
 	} else {
-		exc = "An error occurred while trying to process the request. Please contact your administrator.";
+		exc =
+			"An error occurred while trying to process the request. Please contact your administrator.";
 	}
 
 	const copy_markdown_to_clipboard = () => {
@@ -545,7 +546,7 @@ frappe.request.report_error = function (xhr, request_opts) {
 			"<pre>" + JSON.stringify(request_opts, null, "\t") + "</pre>",
 			"<hr>",
 			"<h5>Response JSON</h5>",
-			"<pre>" + JSON.stringify(data, null, "\t")+ "</pre>"
+			"<pre>" + JSON.stringify(data, null, "\t") + "</pre>",
 		].join("\n");
 
 		var communication_composer = new frappe.views.CommunicationComposer({
