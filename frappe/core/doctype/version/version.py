@@ -88,6 +88,8 @@ def get_diff(old, new, for_child=False):
 			continue
 
 		old_value, new_value = old.get(df.fieldname), new.get(df.fieldname)
+		if not (old_value or new_value):
+			continue
 
 		if df.fieldtype in table_fields:
 			# make maps
