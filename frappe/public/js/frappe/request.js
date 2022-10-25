@@ -175,16 +175,6 @@ frappe.request.call = function (opts) {
 				});
 			}
 		},
-		508: function (xhr) {
-			frappe.utils.play_sound("error");
-			frappe.msgprint({
-				title: __("Please try again"),
-				indicator: "red",
-				message: __(
-					"Another transaction is blocking this one. Please try again in a few seconds."
-				),
-			});
-		},
 		413: function (data, xhr) {
 			frappe.msgprint({
 				indicator: "red",
@@ -206,10 +196,6 @@ frappe.request.call = function (opts) {
 
 			opts.error_callback && opts.error_callback(r);
 		},
-		501: function (data, xhr) {
-			if (typeof data === "string") data = JSON.parse(data);
-			opts.error_callback && opts.error_callback(data, xhr.responseText);
-		},
 		500: function (xhr) {
 			frappe.utils.play_sound("error");
 			try {
@@ -219,12 +205,26 @@ frappe.request.call = function (opts) {
 				frappe.request.report_error(xhr, opts);
 			}
 		},
+		501: function (data, xhr) {
+			if (typeof data === "string") data = JSON.parse(data);
+			opts.error_callback && opts.error_callback(data, xhr.responseText);
+		},
+		502: function (xhr) {
+			frappe.msgprint(__("Internal Server Error"));
+		},
 		504: function (xhr) {
 			frappe.msgprint(__("Request Timed Out"));
 			opts.error_callback && opts.error_callback();
 		},
-		502: function (xhr) {
-			frappe.msgprint(__("Internal Server Error"));
+		508: function (xhr) {
+			frappe.utils.play_sound("error");
+			frappe.msgprint({
+				title: __("Please try again"),
+				indicator: "red",
+				message: __(
+					"Another transaction is blocking this one. Please try again in a few seconds."
+				),
+			});
 		},
 	};
 
@@ -453,20 +453,6 @@ frappe.request.cleanup = function (opts, r) {
 			}
 		}
 
-		// show errors
-		if (r.exc) {
-			r.exc = JSON.parse(r.exc);
-			if (r.exc instanceof Array) {
-				r.exc.forEach((exc) => {
-					if (exc) {
-						console.error(exc);
-					}
-				});
-			} else {
-				console.error(r.exc);
-			}
-		}
-
 		// debug messages
 		if (r._debug_messages) {
 			if (opts.args) {
@@ -524,7 +510,8 @@ frappe.request.report_error = function (xhr, request_opts) {
 		}
 		delete data.exc;
 	} else {
-		exc = "";
+		exc =
+			"An error occurred while trying to process the request. Please contact your administrator.";
 	}
 
 	const copy_markdown_to_clipboard = () => {
@@ -554,9 +541,6 @@ frappe.request.report_error = function (xhr, request_opts) {
 			"<pre>" + JSON.stringify(frappe.boot.versions, null, "\t") + "</pre>",
 			"<h5>Route</h5>",
 			"<pre>" + frappe.get_route_str() + "</pre>",
-			"<hr>",
-			"<h5>Error Report</h5>",
-			"<pre>" + exc + "</pre>",
 			"<hr>",
 			"<h5>Request Data</h5>",
 			"<pre>" + JSON.stringify(request_opts, null, "\t") + "</pre>",
