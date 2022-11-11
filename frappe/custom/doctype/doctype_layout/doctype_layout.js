@@ -93,6 +93,11 @@ frappe.ui.form.on("DocType Layout", {
 				)}</ul>`;
 			}
 
+			// if new fields are added, also add them to local cache for saving
+			for (const field of frm.doc.fields) {
+				frappe.model.update_in_locals(field);
+			}
+
 			if (message) {
 				frappe.msgprint({
 					message: __(message),
