@@ -246,6 +246,7 @@ Object.assign(frappe.utils, {
 	},
 
 	escape_html: function (txt) {
+		if (!txt) return "";
 		let escape_html_mapping = {
 			"&": "&amp;",
 			"<": "&lt;",
@@ -279,9 +280,9 @@ Object.assign(frappe.utils, {
 	},
 
 	html2text: function (html) {
-		let d = document.createElement("div");
-		d.innerHTML = html;
-		return d.textContent;
+		const parser = new DOMParser();
+		const dom = parser.parseFromString(html, "text/html");
+		return dom.body.textContent;
 	},
 
 	is_url: function (txt) {
@@ -1383,7 +1384,7 @@ Object.assign(frappe.utils, {
 			: "";
 
 		return $(`<div class="summary-item">
-			<span class="summary-label">${summary.label}</span>
+			<span class="summary-label">${__(summary.label)}</span>
 			<div class="summary-value ${color}">${value}</div>
 		</div>`);
 	},

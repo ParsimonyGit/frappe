@@ -7,44 +7,17 @@ import re
 
 import frappe
 from frappe import _, is_whitelisted
+from frappe.database.schema import SPECIAL_CHAR_PATTERN
 from frappe.permissions import has_permission
 from frappe.utils import cint, cstr, unique
 
 
 def sanitize_searchfield(searchfield):
-	blacklisted_keywords = ["select", "delete", "drop", "update", "case", "and", "or", "like"]
+	if not searchfield:
+		return
 
-	def _raise_exception(searchfield):
+	if SPECIAL_CHAR_PATTERN.search(searchfield):
 		frappe.throw(_("Invalid Search Field {0}").format(searchfield), frappe.DataError)
-
-	if len(searchfield) == 1:
-		# do not allow special characters to pass as searchfields
-		regex = re.compile(r'^.*[=;*,\'"$\-+%#@()_].*')
-		if regex.match(searchfield):
-			_raise_exception(searchfield)
-
-	if len(searchfield) >= 3:
-
-		# to avoid 1=1
-		if "=" in searchfield:
-			_raise_exception(searchfield)
-
-		# in mysql -- is used for commenting the query
-		elif " --" in searchfield:
-			_raise_exception(searchfield)
-
-		# to avoid and, or and like
-		elif any(f" {keyword} " in searchfield.split() for keyword in blacklisted_keywords):
-			_raise_exception(searchfield)
-
-		# to avoid select, delete, drop, update and case
-		elif any(keyword in searchfield.split() for keyword in blacklisted_keywords):
-			_raise_exception(searchfield)
-
-		else:
-			regex = re.compile(r'^.*[=;*,\'"$\-+%#@()].*')
-			if any(regex.match(f) for f in searchfield.split()):
-				_raise_exception(searchfield)
 
 
 # this is called by the Link Field
@@ -206,11 +179,16 @@ def search_widget(
 				)
 				order_by = f"_relevance, {order_by}"
 
-			ptype = "select" if frappe.only_has_select_perm(doctype) else "read"
 			ignore_permissions = (
 				True
 				if doctype == "DocType"
-				else (cint(ignore_user_permissions) and has_permission(doctype, ptype=ptype))
+				else (
+					cint(ignore_user_permissions)
+					and has_permission(
+						doctype,
+						ptype="select" if frappe.only_has_select_perm(doctype) else "read",
+					)
+				)
 			)
 
 			values = frappe.get_list(
@@ -284,7 +262,9 @@ def build_for_autosuggest(res: list[tuple], doctype: str) -> list[dict]:
 			item = list(item)
 			label = item[1]  # use title as label
 			item[1] = item[0]  # show name in description instead of title
-			del item[2]  # remove redundant title ("label") value
+			if len(item) >= 3 and item[2] == label:
+				# remove redundant title ("label") value
+				del item[2]
 			results.append({"value": item[0], "label": label, "description": to_string(item[1:])})
 	else:
 		results.extend({"value": item[0], "description": to_string(item[1:])} for item in res)

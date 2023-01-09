@@ -649,13 +649,19 @@ export default class GridRow {
 		this.search_columns = {};
 
 		this.grid.setup_visible_columns();
+		let fields =
+			this.grid.user_defined_columns && this.grid.user_defined_columns.length > 0
+				? this.grid.user_defined_columns
+				: this.docfields;
+
 		this.grid.visible_columns.forEach((col, ci) => {
 			// to get update df for the row
-			let df = this.docfields.find((field) => field.fieldname === col[0].fieldname);
+			let df = fields.find((field) => field?.fieldname === col[0].fieldname);
 
 			this.set_dependant_property(df);
 
 			let colsize = col[1];
+
 			let txt = this.doc
 				? frappe.format(this.doc[df.fieldname], df, null, this.doc)
 				: __(df.label);
@@ -944,19 +950,21 @@ export default class GridRow {
 				vertical = false;
 				horizontal = false;
 			})
-			.on("click", function () {
+			.on("click", function (event) {
 				if (frappe.ui.form.editable_row !== me) {
 					var out = me.toggle_editable_row();
 				}
 				var col = this;
 				let first_input_field = $(col).find('input[type="Text"]:first');
-
-				first_input_field.length && on_input_focus(first_input_field);
-
 				first_input_field.trigger("focus");
-				first_input_field.one("blur", () => (input_in_focus = false));
 
-				first_input_field.data("fieldtype") == "Date" && handle_date_picker();
+				if (event.pointerType == "touch") {
+					first_input_field.length && on_input_focus(first_input_field);
+
+					first_input_field.one("blur", () => (input_in_focus = false));
+
+					first_input_field.data("fieldtype") == "Date" && handle_date_picker();
+				}
 
 				return out;
 			});
@@ -1346,8 +1354,13 @@ export default class GridRow {
 		}
 	}
 	refresh_field(fieldname, txt) {
-		let df = this.docfields.find((col) => {
-			return col.fieldname === fieldname;
+		let fields =
+			this.grid.user_defined_columns && this.grid.user_defined_columns.length > 0
+				? this.grid.user_defined_columns
+				: this.docfields;
+
+		let df = fields.find((col) => {
+			return col?.fieldname === fieldname;
 		});
 
 		// format values if no frm

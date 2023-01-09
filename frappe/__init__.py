@@ -42,7 +42,7 @@ from .utils.jinja import (
 )
 from .utils.lazy_loader import lazy_import
 
-__version__ = "14.14.2"
+__version__ = "14.21.1"
 __title__ = "Frappe Framework"
 
 controllers = {}
@@ -454,7 +454,10 @@ def msgprint(
 		out.as_list = 1
 
 	if sys.stdin and sys.stdin.isatty():
-		msg = _strip_html_tags(out.message)
+		if out.as_list:
+			msg = [_strip_html_tags(msg) for msg in out.message]
+		else:
+			msg = _strip_html_tags(out.message)
 
 	if flags.print_messages and out.message:
 		print(f"Message: {_strip_html_tags(out.message)}")
@@ -1019,19 +1022,15 @@ def get_precision(
 	return get_field_precision(get_meta(doctype).get_field(fieldname), doc, currency)
 
 
-def generate_hash(txt: str | None = None, length: int | None = None) -> str:
-	"""Generates random hash for given text + current timestamp + random string."""
-	import hashlib
-	import time
+def generate_hash(txt: str | None = None, length: int = 56) -> str:
+	"""Generate random hash using best available randomness source."""
+	import math
+	import secrets
 
-	from .utils import random_string
+	if not length:
+		length = 56
 
-	digest = hashlib.sha224(
-		((txt or "") + repr(time.time()) + repr(random_string(8))).encode()
-	).hexdigest()
-	if length:
-		digest = digest[:length]
-	return digest
+	return secrets.token_hex(math.ceil(length / 2))[:length]
 
 
 def reset_metadata_version():
@@ -1437,6 +1436,8 @@ def get_doc_hooks():
 
 @request_cache
 def _load_app_hooks(app_name: str | None = None):
+	import types
+
 	hooks = {}
 	apps = [app_name] if app_name else get_installed_apps(sort=True)
 
@@ -1452,9 +1453,13 @@ def _load_app_hooks(app_name: str | None = None):
 			if not request:
 				raise SystemExit
 			raise
-		for key in dir(app_hooks):
+
+		def _is_valid_hook(obj):
+			return not isinstance(obj, (types.ModuleType, types.FunctionType, type))
+
+		for key, value in inspect.getmembers(app_hooks, predicate=_is_valid_hook):
 			if not key.startswith("_"):
-				append_hook(hooks, key, getattr(app_hooks, key))
+				append_hook(hooks, key, value)
 	return hooks
 
 
@@ -1986,6 +1991,7 @@ def get_print(
 	no_letterhead=0,
 	password=None,
 	pdf_options=None,
+	letterhead=None,
 ):
 	"""Get Print Format for given document.
 
@@ -2004,6 +2010,7 @@ def get_print(
 	local.form_dict.style = style
 	local.form_dict.doc = doc
 	local.form_dict.no_letterhead = no_letterhead
+	local.form_dict.letterhead = letterhead
 
 	pdf_options = pdf_options or {}
 	if password:

@@ -69,6 +69,10 @@ class MariaDBExceptionUtil:
 		return e.args[0] == ER.PARSE_ERROR
 
 	@staticmethod
+	def is_statement_timeout(e: pymysql.Error) -> bool:
+		return e.args[0] == 1969
+
+	@staticmethod
 	def is_data_too_long(e: pymysql.Error) -> bool:
 		return e.args[0] == ER.DATA_TOO_LONG
 
@@ -102,6 +106,9 @@ class MariaDBConnectionUtil:
 	def create_connection(self):
 		return pymysql.connect(**self.get_connection_settings())
 
+	def set_execution_timeout(self, seconds: int):
+		self.sql("set session max_statement_time = %s", int(seconds))
+
 	def get_connection_settings(self) -> dict:
 		conn_settings = {
 			"host": self.host,
@@ -112,7 +119,7 @@ class MariaDBConnectionUtil:
 			"use_unicode": True,
 		}
 
-		if self.user != "root":
+		if self.user not in (frappe.flags.root_login, "root"):
 			conn_settings["database"] = self.user
 
 		if self.port:
@@ -122,12 +129,11 @@ class MariaDBConnectionUtil:
 			conn_settings["local_infile"] = frappe.conf.local_infile
 
 		if frappe.conf.db_ssl_ca and frappe.conf.db_ssl_cert and frappe.conf.db_ssl_key:
-			ssl_params = {
+			conn_settings["ssl"] = {
 				"ca": frappe.conf.db_ssl_ca,
 				"cert": frappe.conf.db_ssl_cert,
 				"key": frappe.conf.db_ssl_key,
 			}
-			conn_settings |= ssl_params
 		return conn_settings
 
 

@@ -111,12 +111,6 @@ class Meta(Document):
 	]
 
 	def __init__(self, doctype):
-		# from cache
-		if isinstance(doctype, dict):
-			super().__init__(doctype)
-			self.init_field_map()
-			return
-
 		if isinstance(doctype, Document):
 			super().__init__(doctype.as_dict())
 		else:
@@ -135,15 +129,18 @@ class Meta(Document):
 
 	def process(self):
 		# don't process for special doctypes
-		# prevent's circular dependency
+		# prevents circular dependency
 		if self.name in self.special_doctypes:
-			self.init_field_map()
+			self.init_field_caches()
 			return
 
-		self.add_custom_fields()
+		has_custom_fields = self.add_custom_fields()
 		self.apply_property_setters()
-		self.init_field_map()
-		self.sort_fields()
+		self.init_field_caches()
+
+		if has_custom_fields:
+			self.sort_fields()
+
 		self.get_valid_columns()
 		self.set_custom_permissions()
 		self.add_custom_links_and_actions()
@@ -211,12 +208,6 @@ class Meta(Document):
 		return self._set_only_once_fields
 
 	def get_table_fields(self):
-		if not hasattr(self, "_table_fields"):
-			if self.name != "DocType":
-				self._table_fields = self.get("fields", {"fieldtype": ["in", table_fields]})
-			else:
-				self._table_fields = DOCTYPE_TABLE_FIELDS
-
 		return self._table_fields
 
 	def get_global_search_fields(self):
@@ -319,7 +310,7 @@ class Meta(Document):
 		return list_fields
 
 	def get_custom_fields(self):
-		return [d for d in self.fields if d.get("is_custom_field")]
+		return [d for d in self.fields if getattr(d, "is_custom_field", False)]
 
 	def get_title_field(self):
 		"""Return the title field of this doctype,
@@ -358,17 +349,20 @@ class Meta(Document):
 		if not frappe.db.table_exists("Custom Field"):
 			return
 
-		custom_fields = frappe.db.sql(
-			"""
-			SELECT * FROM `tabCustom Field`
-			WHERE dt = %s AND docstatus < 2
-		""",
-			(self.name,),
-			as_dict=1,
+		custom_fields = frappe.db.get_values(
+			"Custom Field",
+			filters={"dt": self.name},
+			fieldname="*",
+			as_dict=True,
+			order_by="idx",
 			update={"is_custom_field": 1},
 		)
 
+		if not custom_fields:
+			return
+
 		self.extend("fields", custom_fields)
+		return True
 
 	def apply_property_setters(self):
 		"""
@@ -448,47 +442,44 @@ class Meta(Document):
 
 				self.set(fieldname, new_list)
 
-	def init_field_map(self):
+	def init_field_caches(self):
+		# field map
 		self._fields = {field.fieldname: field for field in self.fields}
 
+		# table fields
+		if self.name == "DocType":
+			self._table_fields = DOCTYPE_TABLE_FIELDS
+		else:
+			self._table_fields = self.get("fields", {"fieldtype": ["in", table_fields]})
+
 	def sort_fields(self):
-		"""sort on basis of insert_after"""
-		custom_fields = sorted(self.get_custom_fields(), key=lambda df: df.idx)
+		"""Sort custom fields on the basis of insert_after"""
 
-		if custom_fields:
-			newlist = []
+		field_order = []
+		insert_after_map = {}
 
-			# if custom field is at top
-			# insert_after is false
-			for c in list(custom_fields):
-				if not c.insert_after:
-					newlist.append(c)
-					custom_fields.pop(custom_fields.index(c))
+		for field in self.fields:
+			if not getattr(field, "is_custom_field", False):
+				field_order.append(field.fieldname)
 
-			# standard fields
-			newlist += [df for df in self.get("fields") if not df.get("is_custom_field")]
+			elif insert_after := getattr(field, "insert_after", None):
+				insert_after_map.setdefault(insert_after, []).append(field.fieldname)
 
-			newlist_fieldnames = [df.fieldname for df in newlist]
-			for i in range(2):
-				for df in list(custom_fields):
-					if df.insert_after in newlist_fieldnames:
-						cf = custom_fields.pop(custom_fields.index(df))
-						idx = newlist_fieldnames.index(df.insert_after)
-						newlist.insert(idx + 1, cf)
-						newlist_fieldnames.insert(idx + 1, cf.fieldname)
+			else:
+				# if custom field is at the top, insert after is None
+				field_order.insert(0, field.fieldname)
 
-				if not custom_fields:
-					break
+		if insert_after_map:
+			_update_field_order_based_on_insert_after(field_order, insert_after_map)
 
-			# worst case, add remaining custom fields to last
-			if custom_fields:
-				newlist += custom_fields
+		sorted_fields = []
 
-			# renum idx
-			for i, f in enumerate(newlist):
-				f.idx = i + 1
+		for idx, fieldname in enumerate(field_order, 1):
+			field = self._fields[fieldname]
+			field.idx = idx
+			sorted_fields.append(field)
 
-			self.fields = newlist
+		self.fields = sorted_fields
 
 	def set_custom_permissions(self):
 		"""Reset `permissions` with Custom DocPerm if exists"""
@@ -809,3 +800,28 @@ def trim_table(doctype, dry_run=True):
 		frappe.db.sql_ddl(f"ALTER TABLE `tab{doctype}` {columns_to_remove}")
 
 	return DROPPED_COLUMNS
+
+
+def _update_field_order_based_on_insert_after(field_order, insert_after_map):
+	"""Update the field order based on insert_after_map"""
+
+	retry_field_insertion = True
+
+	while retry_field_insertion:
+		retry_field_insertion = False
+
+		for fieldname in list(insert_after_map):
+			if fieldname not in field_order:
+				continue
+
+			custom_field_index = field_order.index(fieldname)
+			for custom_field_name in insert_after_map.pop(fieldname):
+				custom_field_index += 1
+				field_order.insert(custom_field_index, custom_field_name)
+
+			retry_field_insertion = True
+
+	if insert_after_map:
+		# insert_after is an invalid fieldname, add these fields to the end
+		for fields in insert_after_map.values():
+			field_order.extend(fields)
