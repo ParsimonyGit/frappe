@@ -511,7 +511,7 @@ def get_custom_report_list(module):
 	return out
 
 
-def get_custom_workspace_for_user(page):
+def get_custom_workspace_for_user(page: str):
 	"""Get custom page from workspace if exists or create one
 
 	Args:
@@ -520,8 +520,7 @@ def get_custom_workspace_for_user(page):
 	Returns:
 	        Object: Document object
 	"""
-	filters = {"extends": page, "for_user": frappe.session.user}
-	pages = frappe.get_list("Workspace", filters=filters)
+	pages = frappe.get_all("Workspace", filters={"extends": page, "for_user": frappe.session.user})
 	if pages:
 		return frappe.get_doc("Workspace", pages[0])
 	doc = frappe.new_doc("Workspace")
