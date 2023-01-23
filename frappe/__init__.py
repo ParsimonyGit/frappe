@@ -40,7 +40,7 @@ from .utils.lazy_loader import lazy_import
 # Lazy imports
 faker = lazy_import("faker")
 
-__version__ = "13.41.0"
+__version__ = "13.47.1"
 
 __title__ = "Frappe Framework"
 
@@ -747,7 +747,12 @@ def is_whitelisted(method):
 
 	is_guest = session["user"] == "Guest"
 	if method not in whitelisted or is_guest and method not in guest_methods:
-		throw(_("Not permitted"), PermissionError)
+		summary = _("You are not permitted to access this resource.")
+		detail = _("Function {0} is not whitelisted.").format(
+			bold(f"{method.__module__}.{method.__name__}")
+		)
+		msg = f"<details><summary>{summary}</summary>{detail}</details>"
+		throw(msg, PermissionError, title="Method Not Allowed")
 
 	if is_guest and method not in xss_safe_methods:
 		# strictly sanitize form_dict
@@ -1874,11 +1879,19 @@ def attach_print(
 
 	print_settings = db.get_singles_dict("Print Settings")
 
-	_lang = local.lang
+	lang_change_needed = lang and lang != local.lang
 
-	# set lang as specified in print format attachment
-	if lang:
+	if lang_change_needed:
+		# save original values
+		_lang = local.lang
+		_lang_full_dict = getattr(local, "lang_full_dict", None)
+
+		# set lang as specified in print format attachment
 		local.lang = lang
+
+		# unset lang_full_dict to load new language
+		local.lang_full_dict = None
+
 	local.flags.ignore_print_permissions = True
 
 	no_letterhead = not print_letterhead
@@ -1904,8 +1917,11 @@ def attach_print(
 	out = {"fname": file_name + ext, "fcontent": content}
 
 	local.flags.ignore_print_permissions = False
-	# reset lang to original local lang
-	local.lang = _lang
+
+	if lang_change_needed:
+		# reset original values
+		local.lang = _lang
+		local.lang_full_dict = _lang_full_dict
 
 	return out
 

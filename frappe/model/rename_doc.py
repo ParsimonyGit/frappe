@@ -308,11 +308,6 @@ def rename_doctype(doctype, old, new, force=False):
 	for fieldtype in fields_with_options:
 		update_options_for_fieldtype(fieldtype, old, new)
 
-	# change options where select options are hardcoded i.e. listed
-	select_fields = get_select_fields(old, new)
-	update_link_field_values(select_fields, old, new, doctype)
-	update_select_field_values(old, new)
-
 	# change parenttype for fieldtype Table
 	update_parenttype_values(old, new)
 
@@ -461,7 +456,7 @@ def get_select_fields(old, new):
 			where dt.name = df.parent) as issingle
 		from tabDocField df
 		where
-			df.parent != %s and df.fieldtype = 'Select' and
+			df.parent != %s and df.fieldtype = 'Select' and df.fieldname != 'fieldtype' and
 			df.options like {0} """.format(
 			frappe.db.escape("%" + old + "%")
 		),

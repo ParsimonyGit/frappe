@@ -16,7 +16,6 @@ from frappe.core.utils import ljust_list
 from frappe.model.utils import render_include
 from frappe.modules import get_module_path, scrub
 from frappe.permissions import get_role_permissions
-from frappe.translate import send_translations
 from frappe.utils import (
 	cint,
 	cstr,
@@ -203,10 +202,6 @@ def get_script(report_name):
 
 	if not script:
 		script = "frappe.query_reports['%s']={}" % report_name
-
-	# load translations
-	if frappe.lang != "en":
-		send_translations(frappe.get_lang_dict("report", report_name))
 
 	return {
 		"script": render_include(script),
@@ -397,10 +392,10 @@ def handle_duration_fieldtype_values(result, columns):
 			for entry in range(0, len(result)):
 				row = result[entry]
 				if isinstance(row, dict):
-					val_in_seconds = row[col.fieldname]
+					val_in_seconds = row[col.get("fieldname")]
 					if val_in_seconds:
 						duration_val = format_duration(val_in_seconds)
-						row[col.fieldname] = duration_val
+						row[col.get("fieldname")] = duration_val
 				else:
 					val_in_seconds = row[i]
 					if val_in_seconds:
