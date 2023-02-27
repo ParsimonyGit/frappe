@@ -34,15 +34,6 @@ frappe.Application = class Application {
 		frappe.socketio.init();
 		frappe.model.init();
 
-		if (frappe.boot.status === "failed") {
-			frappe.msgprint({
-				message: frappe.boot.error,
-				title: __("Session Start Failed"),
-				indicator: "red",
-			});
-			throw "boot failed";
-		}
-
 		this.setup_frappe_vue();
 		this.load_bootinfo();
 		this.load_user_permissions();
@@ -169,7 +160,6 @@ frappe.Application = class Application {
 	}
 
 	set_route() {
-		frappe.flags.setting_original_route = true;
 		if (frappe.boot && localStorage.getItem("session_last_route")) {
 			frappe.set_route(localStorage.getItem("session_last_route"));
 			localStorage.removeItem("session_last_route");
@@ -177,7 +167,6 @@ frappe.Application = class Application {
 			// route to home page
 			frappe.router.route();
 		}
-		frappe.after_ajax(() => (frappe.flags.setting_original_route = false));
 		frappe.router.on("change", () => {
 			$(".tooltip").hide();
 		});
@@ -455,6 +444,7 @@ frappe.Application = class Application {
 					}
 				},
 			});
+			dialog.get_field("password").disable_password_checks();
 			dialog.set_primary_action(__("Login"), () => {
 				dialog.set_message(__("Authenticating..."));
 				frappe.call({

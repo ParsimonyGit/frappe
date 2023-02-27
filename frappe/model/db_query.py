@@ -13,9 +13,10 @@ import frappe.permissions
 import frappe.share
 from frappe import _
 from frappe.core.doctype.server_script.server_script_utils import get_server_script_map
-from frappe.database.utils import FallBackDateTimeStr
+from frappe.database.utils import DefaultOrderBy, FallBackDateTimeStr
 from frappe.model import optional_fields
 from frappe.model.meta import get_table_columns
+from frappe.model.utils import is_virtual_doctype
 from frappe.model.utils.user_settings import get_user_settings, update_user_settings
 from frappe.query_builder.utils import Column
 from frappe.utils import (
@@ -72,7 +73,7 @@ class DatabaseQuery:
 		or_filters=None,
 		docstatus=None,
 		group_by=None,
-		order_by="KEEP_DEFAULT_ORDERING",
+		order_by=DefaultOrderBy,
 		limit_start=False,
 		limit_page_length=None,
 		as_list=False,
@@ -162,6 +163,21 @@ class DatabaseQuery:
 
 		if user_settings:
 			self.user_settings = json.loads(user_settings)
+
+		if is_virtual_doctype(self.doctype):
+			from frappe.model.base_document import get_controller
+
+			controller = get_controller(self.doctype)
+			self.parse_args()
+			kwargs = {
+				"as_list": as_list,
+				"with_comment_count": with_comment_count,
+				"save_user_settings": save_user_settings,
+				"save_user_settings_fields": save_user_settings_fields,
+				"pluck": pluck,
+				"parent_doctype": parent_doctype,
+			} | self.__dict__
+			return controller.get_list(kwargs)
 
 		self.columns = self.get_table_columns()
 
@@ -317,13 +333,16 @@ class DatabaseQuery:
 
 		# convert child_table.fieldname to `tabChild DocType`.`fieldname`
 		for field in self.fields:
-			if "." in field and "tab" not in field:
+			if "." in field:
 				original_field = field
 				alias = None
 				if " as " in field:
-					field, alias = field.split(" as ")
-				linked_fieldname, fieldname = field.split(".")
+					field, alias = field.split(" as ", 1)
+				linked_fieldname, fieldname = field.split(".", 1)
 				linked_field = frappe.get_meta(self.doctype).get_field(linked_fieldname)
+				# this is not a link field
+				if not linked_field:
+					continue
 				linked_doctype = linked_field.options
 				if linked_field.fieldtype == "Link":
 					self.append_link_table(linked_doctype, linked_fieldname)
@@ -435,7 +454,7 @@ class DatabaseQuery:
 				if not ("tab" in field and "." in field) or any(x for x in sql_functions if x in field):
 					continue
 
-				table_name = field.split(".")[0]
+				table_name = field.split(".", 1)[0]
 
 				if table_name.lower().startswith("group_concat("):
 					table_name = table_name[13:]
@@ -879,7 +898,7 @@ class DatabaseQuery:
 	def set_order_by(self, args):
 		meta = frappe.get_meta(self.doctype)
 
-		if self.order_by and self.order_by != "KEEP_DEFAULT_ORDERING":
+		if self.order_by and self.order_by != DefaultOrderBy:
 			args.order_by = self.order_by
 		else:
 			args.order_by = ""
@@ -904,8 +923,9 @@ class DatabaseQuery:
 					# will covert to
 					# `tabItem`.`idx` desc, `tabItem`.`modified` desc
 					args.order_by = ", ".join(
-						f"`tab{self.doctype}`.`{f.split()[0].strip()}` {f.split()[1].strip()}"
+						f"`tab{self.doctype}`.`{f_split[0].strip()}` {f_split[1].strip()}"
 						for f in meta.sort_field.split(",")
+						if (f_split := f.split(maxsplit=2))
 					)
 				else:
 					sort_field = meta.sort_field or "modified"
@@ -1036,8 +1056,9 @@ def get_order_by(doctype, meta):
 		# will covert to
 		# `tabItem`.`idx` desc, `tabItem`.`modified` desc
 		order_by = ", ".join(
-			f"`tab{doctype}`.`{f.split()[0].strip()}` {f.split()[1].strip()}"
+			f"`tab{doctype}`.`{f_split[0].strip()}` {f_split[1].strip()}"
 			for f in meta.sort_field.split(",")
+			if (f_split := f.split(maxsplit=2))
 		)
 
 	else:

@@ -314,7 +314,7 @@ def get_translations_from_apps(lang, apps=None):
 			path = os.path.join(frappe.get_pymodule_path(app), "translations", lang + ".csv")
 			translations.update(get_translation_dict_from_file(path, lang, app) or {})
 		if "-" in lang:
-			parent = lang.split("-")[0]
+			parent = lang.split("-", 1)[0]
 			parent_translations = get_translations_from_apps(parent)
 			parent_translations.update(translations)
 			return parent_translations
@@ -1176,7 +1176,7 @@ def rename_language(old_name, new_name):
 
 	language_in_system_settings = frappe.db.get_single_value("System Settings", "language")
 	if language_in_system_settings == old_name:
-		frappe.db.set_value("System Settings", "System Settings", "language", new_name)
+		frappe.db.set_single_value("System Settings", "language", new_name)
 
 	frappe.db.sql(
 		"""update `tabUser` set language=%(new_name)s where language=%(old_name)s""",
