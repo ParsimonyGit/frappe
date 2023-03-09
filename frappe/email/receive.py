@@ -614,11 +614,6 @@ class Email:
 		return l and l[0] or None
 
 
-# fix due to a python bug in poplib that limits it to 2048
-poplib._MAXLINE = 20480
-imaplib._MAXLINE = 20480
-
-
 class TimerMixin(object):
 	def __init__(self, *args, **kwargs):
 		self.timeout = kwargs.pop("timeout", 0.0)
