@@ -3,6 +3,7 @@
 
 from __future__ import print_function, unicode_literals
 
+import chardet
 import imaplib
 import json
 import re
@@ -408,15 +409,24 @@ class EmailAccount(Document):
 			import email
 
 			try:
-				mail = email.message_from_string(raw)
+				if isinstance(raw, bytes):
+					mail = email.message_from_bytes(raw)
+				else:
+					mail = email.message_from_string(raw)
 
 				message_id = mail.get("Message-ID")
 			except Exception:
 				message_id = "can't be parsed"
 
+			if isinstance(raw, bytes):
+				encoding = chardet.detect(raw).get("encoding")
+				raw_content = raw.decode(encoding)
+			else:
+				raw_content = raw
+
 			unhandled_email = frappe.get_doc(
 				{
-					"raw": raw,
+					"raw": raw_content,
 					"uid": uid,
 					"reason": reason,
 					"message_id": message_id,
