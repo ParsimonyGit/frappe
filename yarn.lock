@@ -76,6 +76,11 @@
     "@nodelib/fs.scandir" "2.1.4"
     fastq "^1.6.0"
 
+"@snyk/protect@^1.1107.0":
+  version "1.1107.0"
+  resolved "https://registry.yarnpkg.com/@snyk/protect/-/protect-1.1107.0.tgz#09834fd87f537d7e8da3c33751925cddd372487d"
+  integrity sha512-ul5OYXKpIUfjhau7+fhi4vftypmsNhQGw4FvMZNxnsUuYU9gzzpW+r+Sqfs5GgT7nGzvM+Qxgfwryj4Mk9lNdQ==
+
 "@socket.io/component-emitter@~3.1.0":
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/@socket.io/component-emitter/-/component-emitter-3.1.0.tgz#96116f2a912e0c02817345b3c10751069920d553"
@@ -1261,10 +1266,9 @@ fraction.js@^4.1.2:
   resolved "https://registry.yarnpkg.com/fraction.js/-/fraction.js-4.2.0.tgz#448e5109a313a3527f5a3ab2119ec4cf0e0e2950"
   integrity sha512-MhLuK+2gUcnZe8ZHlaaINnQLl0xRIGRfcGk2yl8xoQAfHrSsL3rYu6FCmBdkdbhc9EPlwyGHewaRsvwRMJtAlA==
 
-frappe-charts@2.0.0-rc22:
-  version "2.0.0-rc22"
-  resolved "https://registry.yarnpkg.com/frappe-charts/-/frappe-charts-2.0.0-rc22.tgz#9a5a747febdc381a1d4d7af96e89cf519dfba8c0"
-  integrity sha512-N7f/8979wJCKjusOinaUYfMxB80YnfuVLrSkjpj4LtyqS0BGS6SuJxUnb7Jl4RWUFEIs7zEhideIKnyLeFZF4Q==
+"frappe-charts@https://github.com/ParsimonyGit/charts/tarball/v13":
+  version "2.0.0-rc13"
+  resolved "https://github.com/ParsimonyGit/charts/tarball/v13#d865920a836b509aa9c2f4aeee6ec779a4c80076"
 
 frappe-datatable@^1.16.4:
   version "1.16.4"
@@ -3070,11 +3074,6 @@ side-channel@^1.0.2, side-channel@^1.0.4:
     call-bind "^1.0.0"
     get-intrinsic "^1.0.2"
     object-inspect "^1.9.0"
-
-snyk@^1.996.0:
-  version "1.996.0"
-  resolved "https://registry.yarnpkg.com/snyk/-/snyk-1.996.0.tgz#0369ca9e6a3a148751294c1320f59a79d5eb3c88"
-  integrity sha512-nq//Ely0bSt50LzX9Er5lCQNqTpaKn7I7xkhUB3Z+8rs8Jqha360HeQwhbVzsuQS3xT/1+36zt6CcgyLPM1QbA==
 
 socket.io-adapter@~2.4.0:
   version "2.4.0"
