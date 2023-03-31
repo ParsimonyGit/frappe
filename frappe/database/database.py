@@ -17,6 +17,7 @@ import frappe.defaults
 import frappe.model.meta
 from frappe import _
 from frappe.database.utils import (
+	DefaultOrderBy,
 	EmptyQueryValues,
 	FallBackDateTimeStr,
 	LazyMogrify,
@@ -218,7 +219,7 @@ class Database:
 			self._cursor.execute(query, values)
 		except Exception as e:
 			if self.is_syntax_error(e):
-				frappe.errprint(f"Syntax error in query:\n{query} {values}")
+				frappe.errprint(f"Syntax error in query:\n{query} {values or ''}")
 
 			elif self.is_deadlocked(e):
 				raise frappe.QueryDeadlockError(e) from e
@@ -459,7 +460,7 @@ class Database:
 		ignore=None,
 		as_dict=False,
 		debug=False,
-		order_by="KEEP_DEFAULT_ORDERING",
+		order_by=DefaultOrderBy,
 		cache=False,
 		for_update=False,
 		*,
@@ -529,7 +530,7 @@ class Database:
 		ignore=None,
 		as_dict=False,
 		debug=False,
-		order_by="KEEP_DEFAULT_ORDERING",
+		order_by=DefaultOrderBy,
 		update=None,
 		cache=False,
 		for_update=False,
@@ -588,7 +589,7 @@ class Database:
 			if (filters is not None) and (filters != doctype or doctype == "DocType"):
 				try:
 					if order_by:
-						order_by = "modified" if order_by == "KEEP_DEFAULT_ORDERING" else order_by
+						order_by = "modified" if order_by == DefaultOrderBy else order_by
 					out = self._get_values_from_table(
 						fields=fields,
 						filters=filters,
@@ -819,7 +820,7 @@ class Database:
 		if fields == "*" and not isinstance(fields, (list, tuple)) and not isinstance(fields, Criterion):
 			as_dict = True
 
-		return self.sql(query, as_dict=as_dict, debug=debug, update=update, run=run, pluck=pluck)
+		return query.run(as_dict=as_dict, debug=debug, update=update, run=run, pluck=pluck)
 
 	def _get_value_for_many_names(
 		self,
@@ -885,13 +886,15 @@ class Database:
 		is_single_doctype = not (dn and dt != dn)
 		to_update = field if isinstance(field, dict) else {field: val}
 
+		if is_single_doctype:
+			deprecation_warning(
+				"Calling db.set_value to set single doctype values is deprecated. This behaviour will be removed in version 15. Use db.set_single_value instead."
+			)
+
 		if update_modified:
 			modified = modified or now()
 			modified_by = modified_by or frappe.session.user
 			to_update.update({"modified": modified, "modified_by": modified_by})
-
-		if for_update:
-			deprecation_warning("for_update parameter is deprecated and will be removed in v15.")
 
 		if is_single_doctype:
 			frappe.db.delete(
@@ -1037,6 +1040,9 @@ class Database:
 					obj.on_rollback()
 			frappe.local.rollback_observers = []
 
+			frappe.local.realtime_log = []
+			frappe.flags.enqueue_after_commit = []
+
 	def field_exists(self, dt, fn):
 		"""Return true of field exists."""
 		return self.exists("DocField", {"fieldname": fn, "parent": dt})
@@ -1099,7 +1105,7 @@ class Database:
 		query = frappe.qb.engine.get_query(
 			table=dt, filters=filters, fields=Count("*"), distinct=distinct
 		)
-		count = self.sql(query, debug=debug)[0][0]
+		count = query.run(debug=debug)[0][0]
 		if not filters and cache:
 			frappe.cache().set_value(f"doctype:count:{dt}", count, expires_in_sec=86400)
 		return count
@@ -1113,13 +1119,7 @@ class Database:
 		if not datetime:
 			return FallBackDateTimeStr
 
-		if isinstance(datetime, str):
-			if ":" not in datetime:
-				datetime = datetime + " 00:00:00.000000"
-		else:
-			datetime = datetime.strftime("%Y-%m-%d %H:%M:%S.%f")
-
-		return datetime
+		return get_datetime(datetime).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 	def get_creation_count(self, doctype, minutes):
 		"""Get count of records created in the last x minutes"""
@@ -1342,8 +1342,8 @@ def enqueue_jobs_after_commit():
 				execute_job,
 				timeout=job.get("timeout"),
 				kwargs=job.get("queue_args"),
-				failure_ttl=RQ_JOB_FAILURE_TTL,
-				result_ttl=RQ_RESULTS_TTL,
+				failure_ttl=frappe.conf.get("rq_job_failure_ttl") or RQ_JOB_FAILURE_TTL,
+				result_ttl=frappe.conf.get("rq_results_ttl") or RQ_RESULTS_TTL,
 			)
 		frappe.flags.enqueue_after_commit = []
 

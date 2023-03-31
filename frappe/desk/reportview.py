@@ -152,12 +152,8 @@ def setup_group_by(data):
 
 		if frappe.db.has_column(data.aggregate_on_doctype, data.aggregate_on_field):
 			data.fields.append(
-				"{aggregate_function}(`tab{aggregate_on_doctype}`.`{aggregate_on_field}`) AS _aggregate_column".format(
-					**data
-				)
+				f"{data.aggregate_function}(`tab{data.aggregate_on_doctype}`.`{data.aggregate_on_field}`) AS _aggregate_column"
 			)
-			if data.aggregate_on_field:
-				data.fields.append(f"`tab{data.aggregate_on_doctype}`.`{data.aggregate_on_field}`")
 		else:
 			raise_invalid_field(data.aggregate_on_field)
 
@@ -186,7 +182,7 @@ def extract_fieldname(field):
 	fieldname = field
 	for sep in (" as ", " AS "):
 		if sep in fieldname:
-			fieldname = fieldname.split(sep)[0]
+			fieldname = fieldname.split(sep, 1)[0]
 
 	# certain functions allowed, extract the fieldname from the function
 	if fieldname.startswith("count(") or fieldname.startswith("sum(") or fieldname.startswith("avg("):
@@ -295,7 +291,7 @@ def save_report(name, doctype, report_settings):
 		if report.report_type != "Report Builder":
 			frappe.throw(_("Only reports of type Report Builder can be edited"))
 
-		if report.owner != frappe.session.user and not frappe.has_permission("Report", "write"):
+		if report.owner != frappe.session.user and not report.has_permission("write"):
 			frappe.throw(_("Insufficient Permissions for editing Report"), frappe.PermissionError)
 	else:
 		report = frappe.new_doc("Report")
@@ -324,7 +320,7 @@ def delete_report(name):
 	if report.report_type != "Report Builder":
 		frappe.throw(_("Only reports of type Report Builder can be deleted"))
 
-	if report.owner != frappe.session.user and not frappe.has_permission("Report", "delete"):
+	if report.owner != frappe.session.user and not report.has_permission("delete"):
 		frappe.throw(_("Insufficient Permissions for deleting Report"), frappe.PermissionError)
 
 	report.delete(ignore_permissions=True)

@@ -35,6 +35,8 @@ def get_context(context):
 	else:
 		doc = frappe.get_doc(frappe.form_dict.doctype, frappe.form_dict.name)
 
+	set_link_titles(doc)
+
 	settings = frappe.parse_json(frappe.form_dict.settings)
 
 	letterhead = frappe.form_dict.letterhead or None
@@ -114,10 +116,10 @@ def get_rendered_template(
 		validate_print_permission(doc)
 
 	if doc.meta.is_submittable:
-		if doc.docstatus == 0 and not cint(print_settings.allow_print_for_draft):
+		if doc.docstatus.is_draft() and not cint(print_settings.allow_print_for_draft):
 			frappe.throw(_("Not allowed to print draft documents"), frappe.PermissionError)
 
-		if doc.docstatus == 2 and not cint(print_settings.allow_print_for_cancelled):
+		if doc.docstatus.is_cancelled() and not cint(print_settings.allow_print_for_cancelled):
 			frappe.throw(_("Not allowed to print cancelled documents"), frappe.PermissionError)
 
 	doc.run_method("before_print", print_settings)
