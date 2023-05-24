@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 import os
+from distutils.version import StrictVersion
 
 import frappe
 from frappe.database.db_manager import DbManager
@@ -130,7 +131,7 @@ def import_db_from_sql(source_sql=None, verbose=False):
 
 def check_database_settings():
 	versions = get_mariadb_versions()
-	if versions["major"] <= "10.2":
+	if StrictVersion(versions["major"]) <= StrictVersion("10.2"):
 		expected_variables = expected_settings_10_2_earlier
 	else:
 		expected_variables = expected_settings_10_3_later
