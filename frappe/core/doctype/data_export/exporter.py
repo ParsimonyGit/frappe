@@ -371,7 +371,6 @@ class DataExporter:
 				for c in self.child_doctypes:
 					if is_virtual_doctype(c["doctype"]):
 						continue
-
 					child_doctype_table = DocType(c["doctype"])
 					data_row = (
 						frappe.qb.from_(child_doctype_table)
