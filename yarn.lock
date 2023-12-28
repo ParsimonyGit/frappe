@@ -1265,10 +1265,10 @@ fraction.js@^4.1.2:
   version "2.0.0-rc13"
   resolved "https://github.com/ParsimonyGit/charts/tarball/v13#d865920a836b509aa9c2f4aeee6ec779a4c80076"
 
-frappe-datatable@^1.17.3:
-  version "1.17.3"
-  resolved "https://registry.yarnpkg.com/frappe-datatable/-/frappe-datatable-1.17.3.tgz#f486a0de2e977f0fe57aa65b6cc1bc2c05f94172"
-  integrity sha512-HUBwogmsExglXbBFvHnzRssHGnJlsVXv6/7KhVbdh1y3S8JH4YoRQ6q1SOaW8escTuAa2d91OVe5uJ10IbGrlA==
+frappe-datatable@^1.17.9:
+  version "1.17.9"
+  resolved "https://registry.yarnpkg.com/frappe-datatable/-/frappe-datatable-1.17.9.tgz#5ef4e5d335079ab5bf2abfecc916e31ecf17a5cb"
+  integrity sha512-C1U5YKk7kP32eiHVnv1AdY5LafKKoGrcDpbErqM95PYrhanaq2Uvkvdsjo6yioLpPfnvFD8Vihm4JoGc8FjDcw==
   dependencies:
     hyperlist "^1.0.0-beta"
     lodash "^4.17.5"
