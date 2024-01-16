@@ -219,13 +219,14 @@ frappe.ui.form.Attachments = class Attachments {
 				this.frm.meta.max_attachments - this.frm.attachments.get_attachments().length;
 		}
 
-		new frappe.ui.FileUploader({
+		this.file_uploader = new frappe.ui.FileUploader({
 			doctype: this.frm.doctype,
 			docname: this.frm.docname,
 			frm: this.frm,
 			folder: "Home/Attachments",
 			on_success: (file_doc) => {
 				this.attachment_uploaded(file_doc);
+				this.file_uploader = undefined;
 			},
 			restrictions,
 			make_attachments_public: this.frm.meta.make_attachments_public,
