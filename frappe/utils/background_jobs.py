@@ -198,7 +198,7 @@ def execute_job(site, method, event, job_name, kwargs, user=None, is_async=True,
 		method_name = method
 		method = frappe.get_attr(method)
 	else:
-		method_name = cstr(method.__name__)
+		method_name = f"{method.__module__}.{method.__qualname__}"
 
 	frappe.local.job = frappe._dict(
 		site=site,
@@ -502,15 +502,18 @@ def get_redis_conn(username=None, password=None):
 			return get_redis_connection_without_auth()
 		else:
 			return RedisQueue.get_connection(**cred)
-	except (redis.exceptions.AuthenticationError, redis.exceptions.ResponseError):
+	except redis.exceptions.AuthenticationError:
 		log(
 			f'Wrong credentials used for {cred.username or "default user"}. '
 			"You can reset credentials using `bench create-rq-users` CLI and restart the server",
 			colour="red",
 		)
 		raise
-	except Exception:
-		log(f"Please make sure that Redis Queue runs @ {frappe.get_conf().redis_queue}", colour="red")
+	except Exception as e:
+		log(
+			f"Please make sure that Redis Queue runs @ {frappe.get_conf().redis_queue}. Redis reported error: {str(e)}",
+			colour="red",
+		)
 		raise
 
 
