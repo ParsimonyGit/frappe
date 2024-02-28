@@ -2,7 +2,6 @@
 # License: MIT. See LICENSE
 
 import datetime
-import inspect
 from math import ceil
 from random import choice
 from unittest.mock import patch
@@ -11,13 +10,13 @@ import frappe
 from frappe.core.utils import find
 from frappe.custom.doctype.custom_field.custom_field import create_custom_field
 from frappe.database import savepoint
-from frappe.database.database import Database, get_query_execution_timeout
+from frappe.database.database import get_query_execution_timeout
 from frappe.database.utils import FallBackDateTimeStr
 from frappe.query_builder import Field
 from frappe.query_builder.functions import Concat_ws
 from frappe.tests.test_query_builder import db_type_is, run_only_if
 from frappe.tests.utils import FrappeTestCase
-from frappe.utils import add_days, cint, now, random_string, set_request
+from frappe.utils import add_days, now, random_string, set_request
 from frappe.utils.testutils import clear_custom_fields
 
 
@@ -57,6 +56,17 @@ class TestDB(FrappeTestCase):
 			frappe.db.rollback(save_point=savepoint)
 			self.fail("Long running queries not timing out")
 
+	def test_skip_locking(self):
+		first_conn = frappe.local.db
+		name = frappe.db.get_value("User", "Administrator", "name", for_update=True, skip_locked=True)
+		self.assertEqual(name, "Administrator")
+
+		frappe.connect()  # Create a 2nd connection
+		second_conn = frappe.local.db
+		self.assertIsNot(first_conn, second_conn)
+		name = frappe.db.get_value("User", "Administrator", "name", for_update=True, skip_locked=True)
+		self.assertFalse(name)
+
 	@patch.dict(frappe.conf, {"http_timeout": 20, "enable_db_statement_timeout": 1})
 	def test_db_timeout_computation(self):
 		set_request(method="GET", path="/")
@@ -80,9 +90,7 @@ class TestDB(FrappeTestCase):
 		)
 		self.assertIn(
 			"for update",
-			frappe.db.get_value(
-				"User", Field("name") == "Administrator", for_update=True, run=False
-			).lower(),
+			frappe.db.get_value("User", Field("name") == "Administrator", for_update=True, run=False).lower(),
 		)
 		user_doctype = frappe.qb.DocType("User")
 		self.assertEqual(
@@ -155,9 +163,7 @@ class TestDB(FrappeTestCase):
 			"Datetime": datetime.datetime.now(),
 			"Time": datetime.timedelta(hours=9, minutes=45, seconds=10),
 		}
-		test_inputs = [
-			{"fieldtype": fieldtype, "value": value} for fieldtype, value in values_dict.items()
-		]
+		test_inputs = [{"fieldtype": fieldtype, "value": value} for fieldtype, value in values_dict.items()]
 		for fieldtype in values_dict:
 			create_custom_field(
 				"Print Settings",
@@ -176,6 +182,13 @@ class TestDB(FrappeTestCase):
 
 		# teardown
 		clear_custom_fields("Print Settings")
+
+	def test_get_single_value_destructuring(self):
+		[[lang, date_format]] = frappe.db.get_values_from_single(
+			["language", "date_format"], None, "System Settings"
+		)
+		self.assertEqual(lang, frappe.db.get_single_value("System Settings", "language"))
+		self.assertEqual(date_format, frappe.db.get_single_value("System Settings", "date_format"))
 
 	def test_log_touched_tables(self):
 		frappe.flags.in_migrate = True
@@ -333,38 +346,40 @@ class TestDB(FrappeTestCase):
 		random_value = random_string(20)
 
 		# Testing read
+		self.assertEqual(next(iter(frappe.get_all("ToDo", fields=[random_field], limit=1)[0])), random_field)
 		self.assertEqual(
-			list(frappe.get_all("ToDo", fields=[random_field], limit=1)[0])[0], random_field
-		)
-		self.assertEqual(
-			list(frappe.get_all("ToDo", fields=[f"`{random_field}` as total"], limit=1)[0])[0], "total"
+			next(iter(frappe.get_all("ToDo", fields=[f"`{random_field}` as total"], limit=1)[0])), "total"
 		)
 
 		# Testing read for distinct and sql functions
 		self.assertEqual(
-			list(
-				frappe.get_all(
-					"ToDo",
-					fields=[f"`{random_field}` as total"],
-					distinct=True,
-					limit=1,
-				)[0]
-			)[0],
+			next(
+				iter(
+					frappe.get_all(
+						"ToDo",
+						fields=[f"`{random_field}` as total"],
+						distinct=True,
+						limit=1,
+					)[0]
+				)
+			),
 			"total",
 		)
 		self.assertEqual(
-			list(
-				frappe.get_all(
-					"ToDo",
-					fields=[f"`{random_field}`"],
-					distinct=True,
-					limit=1,
-				)[0]
-			)[0],
+			next(
+				iter(
+					frappe.get_all(
+						"ToDo",
+						fields=[f"`{random_field}`"],
+						distinct=True,
+						limit=1,
+					)[0]
+				)
+			),
 			random_field,
 		)
 		self.assertEqual(
-			list(frappe.get_all("ToDo", fields=[f"count(`{random_field}`)"], limit=1)[0])[0],
+			next(iter(frappe.get_all("ToDo", fields=[f"count(`{random_field}`)"], limit=1)[0])),
 			"count" if frappe.conf.db_type == "postgres" else f"count(`{random_field}`)",
 		)
 
@@ -432,7 +447,7 @@ class TestDB(FrappeTestCase):
 		frappe.db.MAX_WRITES_PER_TRANSACTION = 1
 		note = frappe.get_last_doc("ToDo")
 		note.description = "changed"
-		with self.assertRaises(frappe.TooManyWritesError) as tmw:
+		with self.assertRaises(frappe.TooManyWritesError):
 			note.save()
 
 		frappe.db.MAX_WRITES_PER_TRANSACTION = Database.MAX_WRITES_PER_TRANSACTION
@@ -551,9 +566,7 @@ class TestDB(FrappeTestCase):
 			modify_query(query),
 		)
 
-		query = (
-			'select locate(".io", "frappe.io"), locate("3", cast(3 as varchar)), locate("3", 3::varchar)'
-		)
+		query = 'select locate(".io", "frappe.io"), locate("3", cast(3 as varchar)), locate("3", 3::varchar)'
 		self.assertEqual(
 			'select strpos( "frappe.io", ".io"), strpos( cast(3 as varchar), "3"), strpos( 3::varchar, "3")',
 			modify_query(query),
@@ -573,7 +586,6 @@ class TestDB(FrappeTestCase):
 		)
 
 	def test_callbacks(self):
-
 		order_of_execution = []
 
 		def f(val):
@@ -730,9 +742,7 @@ class TestDBSetValue(FrappeTestCase):
 		self.assertEqual(status, updated_status)
 
 	def test_update_multiple_rows_single_column(self):
-		frappe.db.set_value(
-			"ToDo", {"description": ("like", "%test_set_value%")}, "description", "change 2"
-		)
+		frappe.db.set_value("ToDo", {"description": ("like", "%test_set_value%")}, "description", "change 2")
 
 		self.assertEqual(frappe.db.get_value("ToDo", self.todo1.name, "description"), "change 2")
 		self.assertEqual(frappe.db.get_value("ToDo", self.todo2.name, "description"), "change 2")
@@ -968,3 +978,36 @@ class TestReplicaConnections(FrappeTestCase):
 
 			outer()
 			self.assertEqual(write_connection, db_id())
+
+
+class TestSqlIterator(FrappeTestCase):
+	def test_db_sql_iterator(self):
+		test_queries = [
+			"select * from `tabCountry` order by name",
+			"select code from `tabCountry` order by name",
+			"select code from `tabCountry` order by name limit 5",
+		]
+
+		for query in test_queries:
+			self.assertEqual(
+				frappe.db.sql(query, as_dict=True),
+				list(frappe.db.sql(query, as_dict=True, as_iterator=True)),
+				msg=f"{query=} results not same as iterator",
+			)
+
+			self.assertEqual(
+				frappe.db.sql(query, pluck=True),
+				list(frappe.db.sql(query, pluck=True, as_iterator=True)),
+				msg=f"{query=} results not same as iterator",
+			)
+
+			self.assertEqual(
+				frappe.db.sql(query, as_list=True),
+				list(frappe.db.sql(query, as_list=True, as_iterator=True)),
+				msg=f"{query=} results not same as iterator",
+			)
+
+	@run_only_if(db_type_is.MARIADB)
+	def test_unbuffered_cursor(self):
+		with frappe.db.unbuffered_cursor():
+			self.test_db_sql_iterator()

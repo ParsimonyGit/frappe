@@ -34,8 +34,8 @@ class RQWorker(Document):
 		utilization_percent: DF.Percent
 		worker_name: DF.Data | None
 	# end: auto-generated types
-	def load_from_db(self):
 
+	def load_from_db(self):
 		all_workers = get_workers()
 		workers = [w for w in all_workers if w.pid == cint(self.name)]
 		if not workers:

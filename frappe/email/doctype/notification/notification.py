@@ -63,6 +63,7 @@ class Notification(Document):
 		slack_webhook_url: DF.Link | None
 		subject: DF.Data | None
 		value_changed: DF.Literal
+
 	# end: auto-generated types
 	def onload(self):
 		"""load message"""
@@ -363,7 +364,9 @@ def get_context(context):
 
 			# For sending messages to specified role
 			if recipient.receiver_by_role:
-				receiver_list += get_info_based_on_role(recipient.receiver_by_role, "mobile_no")
+				receiver_list += get_info_based_on_role(
+					recipient.receiver_by_role, "mobile_no", ignore_permissions=True
+				)
 
 		return receiver_list
 
@@ -376,7 +379,6 @@ def get_context(context):
 		if (doc.docstatus == 0 and not print_settings.allow_print_for_draft) or (
 			doc.docstatus == 2 and not print_settings.allow_print_for_cancelled
 		):
-
 			# ignoring attachment as draft and cancelled documents are not allowed to print
 			status = "Draft" if doc.docstatus == 0 else "Cancelled"
 			frappe.throw(

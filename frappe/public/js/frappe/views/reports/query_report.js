@@ -1226,7 +1226,7 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 					if (column.colIndex === index && !value) {
 						value = "Total";
 						column = { fieldtype: "Data" }; // avoid type issues for value if Date column
-					} else if (in_list(["Currency", "Float"], column.fieldtype)) {
+					} else if (["Currency", "Float"].includes(column.fieldtype)) {
 						// proxy for currency and float
 						data = this.data[0];
 					}
@@ -1461,7 +1461,10 @@ frappe.views.QueryReport = class QueryReport extends frappe.views.BaseList {
 			.map((fieldname) => {
 				const docfield = frappe.query_report.get_filter(fieldname).df;
 				const value = applied_filters[fieldname];
-				return `<h6>${__(docfield.label)}: ${frappe.format(value, docfield)}</h6>`;
+				return `<h6>${__(docfield.label, null, docfield.parent)}: ${frappe.format(
+					value,
+					docfield
+				)}</h6>`;
 			})
 			.join("");
 	}

@@ -91,9 +91,7 @@ on_session_creation = [
 	"frappe.core.doctype.user.user.notify_admin_access_to_system_manager",
 ]
 
-on_logout = (
-	"frappe.core.doctype.session_default_settings.session_default_settings.clear_session_defaults"
-)
+on_logout = "frappe.core.doctype.session_default_settings.session_default_settings.clear_session_defaults"
 
 # PDF
 pdf_header_html = "frappe.utils.pdf.pdf_header_html"
@@ -139,9 +137,7 @@ has_permission = {
 	"Notification Settings": "frappe.desk.doctype.notification_settings.notification_settings.has_permission",
 }
 
-has_website_permission = {
-	"Address": "frappe.contacts.doctype.address.address.has_website_permission"
-}
+has_website_permission = {"Address": "frappe.contacts.doctype.address.address.has_website_permission"}
 
 jinja = {
 	"methods": "frappe.utils.jinja_globals",
@@ -433,6 +429,7 @@ before_request = [
 
 # Background Job Hooks
 before_job = [
+	"frappe.recorder.record",
 	"frappe.monitor.start",
 ]
 
@@ -443,6 +440,7 @@ if os.getenv("FRAPPE_SENTRY_DSN") and (
 	before_job.append("frappe.utils.sentry.set_sentry_context")
 
 after_job = [
+	"frappe.recorder.dump",
 	"frappe.monitor.stop",
 	"frappe.utils.file_lock.release_document_locks",
 	"frappe.utils.telemetry.flush",
@@ -458,15 +456,15 @@ export_python_type_annotations = True
 
 # log doctype cleanups to automatically add in log settings
 default_log_clearing_doctypes = {
-	"Error Log": 30,
-	"Activity Log": 90,
+	"Error Log": 14,
 	"Email Queue": 30,
-	"Scheduled Job Log": 90,
-	"Route History": 90,
-	"Submission Queue": 30,
-	"Prepared Report": 30,
+	"Scheduled Job Log": 7,
+	"Submission Queue": 7,
+	"Prepared Report": 14,
 	"Webhook Request Log": 30,
-	"Integration Request": 90,
 	"Unhandled Email": 30,
 	"Reminder": 30,
+	"Integration Request": 90,
+	"Activity Log": 90,
+	"Route History": 90,
 }
