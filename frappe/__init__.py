@@ -11,6 +11,7 @@ be used to build database driven apps.
 Read the documentation: https://frappeframework.com/docs
 """
 import copy
+import faulthandler
 import functools
 import gc
 import importlib
@@ -18,6 +19,7 @@ import inspect
 import json
 import os
 import re
+import signal
 import traceback
 import unicodedata
 import warnings
@@ -48,7 +50,7 @@ from .utils.jinja import (
 )
 from .utils.lazy_loader import lazy_import
 
-__version__ = "15.16.0"
+__version__ = "15.19.1"
 __title__ = "Frappe Framework"
 
 controllers = {}
@@ -263,6 +265,7 @@ def init(site: str, sites_path: str = ".", new_site: bool = False, force=False) 
 	if not _qb_patched.get(local.conf.db_type):
 		patch_query_execute()
 		patch_query_aggregation()
+		_register_fault_handler()
 
 	setup_module_map(include_all_apps=not (frappe.request or frappe.job or frappe.flags.in_migrate))
 
@@ -426,9 +429,9 @@ def setup_redis_cache_connection():
 	global cache
 
 	if not cache:
-		from frappe.utils.redis_wrapper import RedisWrapper
+		from frappe.utils.redis_wrapper import setup_cache
 
-		cache = RedisWrapper.from_url(conf.get("redis_cache"))
+		cache = setup_cache()
 
 
 def get_traceback(with_context: bool = False) -> str:
@@ -458,8 +461,7 @@ def log(msg: str) -> None:
 
 	:param msg: Message."""
 	if not request:
-		if conf.get("logging") or False:
-			print(repr(msg))
+		print(repr(msg))
 
 	debug_log.append(as_unicode(msg))
 
@@ -585,11 +587,18 @@ def throw(
 	is_minimizable: bool = False,
 	wide: bool = False,
 	as_list: bool = False,
+	primary_action=None,
 ) -> None:
 	"""Throw execption and show message (`msgprint`).
 
 	:param msg: Message.
-	:param exc: Exception class. Default `frappe.ValidationError`"""
+	:param exc: Exception class. Default `frappe.ValidationError`
+	:param title: [optional] Message title. Default: "Message".
+	:param is_minimizable: [optional] Allow users to minimize the modal
+	:param wide: [optional] Show wide modal
+	:param as_list: [optional] If `msg` is a list, render as un-ordered list.
+	:param primary_action: [optional] Bind a primary server/client side action.
+	"""
 	msgprint(
 		msg,
 		raise_exception=exc,
@@ -598,6 +607,7 @@ def throw(
 		is_minimizable=is_minimizable,
 		wide=wide,
 		as_list=as_list,
+		primary_action=primary_action,
 	)
 
 
@@ -1611,11 +1621,19 @@ def append_hook(target, key, value):
 		target[key].extend(value)
 
 
-def setup_module_map(include_all_apps=True):
-	"""Rebuild map of all modules (internal)."""
-	if conf.db_name:
+def setup_module_map(include_all_apps: bool = True) -> None:
+	"""
+	Function to rebuild map of all modules
+
+	:param: include_all_apps: Include all apps on bench, or just apps installed on the site.
+	:return: Nothing
+	"""
+	if include_all_apps:
 		local.app_modules = cache.get_value("app_modules")
 		local.module_app = cache.get_value("module_app")
+	else:
+		local.app_modules = cache.get_value("installed_app_modules")
+		local.module_app = cache.get_value("module_installed_app")
 
 	if not (local.app_modules and local.module_app):
 		local.module_app, local.app_modules = {}, {}
@@ -1634,9 +1652,12 @@ def setup_module_map(include_all_apps=True):
 				local.module_app[module] = app
 				local.app_modules[app].append(module)
 
-		if conf.db_name:
+		if include_all_apps:
 			cache.set_value("app_modules", local.app_modules)
 			cache.set_value("module_app", local.module_app)
+		else:
+			cache.set_value("installed_app_modules", local.app_modules)
+			cache.set_value("module_installed_app", local.module_app)
 
 
 def get_file_items(path, raise_not_found=False, ignore_empty_lines=True):
@@ -2089,24 +2110,27 @@ def get_print(
 	:param as_pdf: Return as PDF. Default False.
 	:param password: Password to encrypt the pdf with. Default None"""
 	from frappe.utils.pdf import get_pdf
-	from frappe.website.serve import get_response_content
+	from frappe.website.serve import get_response_without_exception_handling
 
 	original_form_dict = copy.deepcopy(local.form_dict)
+	try:
+		local.form_dict.doctype = doctype
+		local.form_dict.name = name
+		local.form_dict.format = print_format
+		local.form_dict.style = style
+		local.form_dict.doc = doc
+		local.form_dict.no_letterhead = no_letterhead
+		local.form_dict.letterhead = letterhead
 
-	local.form_dict.doctype = doctype
-	local.form_dict.name = name
-	local.form_dict.format = print_format
-	local.form_dict.style = style
-	local.form_dict.doc = doc
-	local.form_dict.no_letterhead = no_letterhead
-	local.form_dict.letterhead = letterhead
+		pdf_options = pdf_options or {}
+		if password:
+			pdf_options["password"] = password
 
-	pdf_options = pdf_options or {}
-	if password:
-		pdf_options["password"] = password
+		response = get_response_without_exception_handling("printview", 200)
+		html = str(response.data, "utf-8")
+	finally:
+		local.form_dict = original_form_dict
 
-	html = get_response_content("printview")
-	local.form_dict = original_form_dict
 	return get_pdf(html, options=pdf_options, output=output) if as_pdf else html
 
 
@@ -2436,6 +2460,10 @@ def validate_and_sanitize_search_inputs(fn):
 		return fn(**kwargs)
 
 	return wrapper
+
+
+def _register_fault_handler():
+	faulthandler.register(signal.SIGUSR1)
 
 
 from frappe.utils.error import log_error

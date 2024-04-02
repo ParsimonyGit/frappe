@@ -221,19 +221,14 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 		this.setup_datatable(this.data);
 	}
 
-	render_count() {
-		if (this.list_view_settings?.disable_count) {
-			return;
-		}
-		let $list_count = this.$paging_area.find(".list-count");
-		if (!$list_count.length) {
-			$list_count = $("<span>")
+	get_count_element() {
+		let $count = this.$paging_area.find(".list-count");
+		if (!$count.length) {
+			$count = $("<span>")
 				.addClass("text-muted list-count")
 				.prependTo(this.$paging_area.find(".level-right"));
 		}
-		this.get_count_str().then((str) => {
-			$list_count.text(str);
-		});
+		return $count;
 	}
 
 	on_update(data) {
@@ -1477,7 +1472,8 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 					if (this.add_totals_row) {
 						const total_data = this.get_columns_totals(this.data);
 
-						total_data["name"] = __("Totals").bold();
+						total_data["name"] = __("Total");
+						total_data.is_total_row = true;
 						rows_in_order.push(total_data);
 					}
 
