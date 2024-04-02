@@ -81,13 +81,11 @@ class TestAutoAssign(FrappeTestCase):
 		self.assignment_rule.save()
 
 		for _ in range(30):
-			note = make_note(dict(public=1))
+			make_note(dict(public=1))
 
 		# check if each user has 10 assignments (?)
 		for user in ("test@example.com", "test1@example.com", "test2@example.com"):
-			self.assertEqual(
-				len(frappe.get_all("ToDo", dict(allocated_to=user, reference_type="Note"))), 10
-			)
+			self.assertEqual(len(frappe.get_all("ToDo", dict(allocated_to=user, reference_type="Note"))), 10)
 
 		# clear 5 assignments for first user
 		# can't do a limit in "delete" since postgres does not support it
@@ -97,14 +95,26 @@ class TestAutoAssign(FrappeTestCase):
 			frappe.db.delete("ToDo", {"name": d.name})
 
 		# add 5 more assignments
-		for i in range(5):
+		for _i in range(5):
 			make_note(dict(public=1))
 
 		# check if each user still has 10 assignments
 		for user in ("test@example.com", "test1@example.com", "test2@example.com"):
-			self.assertEqual(
-				len(frappe.get_all("ToDo", dict(allocated_to=user, reference_type="Note"))), 10
-			)
+			self.assertEqual(len(frappe.get_all("ToDo", dict(allocated_to=user, reference_type="Note"))), 10)
+
+	def test_assingment_on_guest_submissions(self):
+		"""Sometimes documents are inserted as guest, check if assignment rules run on them. Use case: Web Forms"""
+		with self.set_user("Guest"):
+			doc = make_note({"public": 1}, ignore_permissions=True)
+
+		# check assignment to *anyone*
+		self.assertTrue(
+			frappe.db.get_value(
+				"ToDo",
+				{"reference_type": "Note", "reference_name": doc.name, "status": "Open"},
+				"allocated_to",
+			),
+		)
 
 	def test_based_on_field(self):
 		self.assignment_rule.rule = "Based on Field"
@@ -375,13 +385,13 @@ def get_assignment_rule(days, assign=None):
 	return assignment_rule
 
 
-def make_note(values=None):
+def make_note(values=None, *, ignore_permissions=False):
 	note = frappe.get_doc(dict(doctype="Note", title=random_string(10), content=random_string(20)))
 
 	if values:
 		note.update(values)
 
-	note.insert()
+	note.insert(ignore_permissions=ignore_permissions)
 
 	return note
 

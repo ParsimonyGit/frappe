@@ -14,8 +14,6 @@ app_email = "developers@frappe.io"
 
 docs_app = "frappe_docs"
 
-translator_url = "https://translate.erpnext.com"
-
 before_install = "frappe.utils.install.before_install"
 after_install = "frappe.utils.install.after_install"
 
@@ -80,9 +78,7 @@ on_session_creation = [
 	"frappe.core.doctype.user.user.notify_admin_access_to_system_manager",
 ]
 
-on_logout = (
-	"frappe.core.doctype.session_default_settings.session_default_settings.clear_session_defaults"
-)
+on_logout = "frappe.core.doctype.session_default_settings.session_default_settings.clear_session_defaults"
 
 # permissions
 
@@ -122,9 +118,7 @@ has_permission = {
 	"Prepared Report": "frappe.core.doctype.prepared_report.prepared_report.has_permission",
 }
 
-has_website_permission = {
-	"Address": "frappe.contacts.doctype.address.address.has_website_permission"
-}
+has_website_permission = {"Address": "frappe.contacts.doctype.address.address.has_website_permission"}
 
 jinja = {
 	"methods": "frappe.utils.jinja_globals",
@@ -140,9 +134,7 @@ standard_queries = {"User": "frappe.core.doctype.user.user.user_query"}
 
 doc_events = {
 	"*": {
-		"after_insert": [
-			"frappe.event_streaming.doctype.event_update_log.event_update_log.notify_consumers"
-		],
+		"after_insert": ["frappe.event_streaming.doctype.event_update_log.event_update_log.notify_consumers"],
 		"on_update": [
 			"frappe.desk.notifications.clear_doctype_notifications",
 			"frappe.core.doctype.activity_log.feed.update_feed",
@@ -169,6 +161,7 @@ doc_events = {
 			"frappe.workflow.doctype.workflow_action.workflow_action.process_workflow_actions",
 			"frappe.automation.doctype.assignment_rule.assignment_rule.apply",
 			"frappe.automation.doctype.assignment_rule.assignment_rule.update_due_date",
+			"frappe.core.doctype.file.utils.attach_files_to_document",
 		],
 		"on_change": [
 			"frappe.social.doctype.energy_point_rule.energy_point_rule.process_energy_points",
@@ -286,7 +279,7 @@ setup_wizard_exception = [
 	"frappe.desk.page.setup_wizard.setup_wizard.log_setup_wizard_exception",
 ]
 
-before_migrate = []
+before_migrate = ["frappe.core.doctype.patch_log.patch_log.before_migrate"]
 after_migrate = ["frappe.website.doctype.website_theme.website_theme.after_migrate"]
 
 otp_methods = ["OTP App", "Email", "SMS"]
@@ -414,6 +407,9 @@ ignore_links_on_delete = [
 	"Integration Request",
 	"Unhandled Email",
 	"Webhook Request Log",
+	"Workspace",
+	"Route History",
+	"Access Log",
 ]
 
 # Request Hooks

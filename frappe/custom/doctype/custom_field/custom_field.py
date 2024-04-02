@@ -120,9 +120,7 @@ class CustomField(Document):
 		frappe.db.delete("Property Setter", {"doc_type": self.dt, "field_name": self.fieldname})
 
 		# update doctype layouts
-		doctype_layouts = frappe.get_all(
-			"DocType Layout", filters={"document_type": self.dt}, pluck="name"
-		)
+		doctype_layouts = frappe.get_all("DocType Layout", filters={"document_type": self.dt}, pluck="name")
 
 		for layout in doctype_layouts:
 			layout_doc = frappe.get_doc("DocType Layout", layout)
@@ -255,7 +253,7 @@ def rename_fieldname(custom_field: str, fieldname: str):
 	if field.is_system_generated:
 		frappe.throw(_("System Generated Fields can not be renamed"))
 	if frappe.db.has_column(parent_doctype, fieldname):
-		frappe.throw(_("Can not rename as fieldname {0} is already present on DocType."))
+		frappe.throw(_("Can not rename as column {0} is already present on DocType.").format(fieldname))
 	if old_fieldname == new_fieldname:
 		frappe.msgprint(_("Old and new fieldnames are same."), alert=True)
 		return
@@ -267,13 +265,12 @@ def rename_fieldname(custom_field: str, fieldname: str):
 	field.db_set("fieldname", field.fieldname, notify=True)
 	_update_fieldname_references(field, old_fieldname, new_fieldname)
 
+	frappe.msgprint(_("Custom field renamed to {0} successfully.").format(fieldname), alert=True)
 	frappe.db.commit()
 	frappe.clear_cache()
 
 
-def _update_fieldname_references(
-	field: CustomField, old_fieldname: str, new_fieldname: str
-) -> None:
+def _update_fieldname_references(field: CustomField, old_fieldname: str, new_fieldname: str) -> None:
 	# Passwords are stored in auth table, so column name needs to be updated there.
 	if field.fieldtype == "Password":
 		Auth = frappe.qb.Table("__Auth")

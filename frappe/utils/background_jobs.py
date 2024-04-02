@@ -20,6 +20,7 @@ import frappe.monitor
 from frappe import _
 from frappe.utils import cint, cstr, get_bench_id
 from frappe.utils.commands import log
+from frappe.utils.deprecations import deprecation_warning
 from frappe.utils.redis_queue import RedisQueue
 
 if TYPE_CHECKING:
@@ -48,8 +49,7 @@ def get_queues_timeout():
 		"default": default_timeout,
 		"long": 1500,
 		**{
-			worker: config.get("timeout", default_timeout)
-			for worker, config in custom_workers_config.items()
+			worker: config.get("timeout", default_timeout) for worker, config in custom_workers_config.items()
 		},
 	}
 
@@ -76,7 +76,7 @@ def enqueue(
 	:param timeout: should be set according to the functions
 	:param event: this is passed to enable clearing of jobs from queues
 	:param is_async: if is_async=False, the method is executed immediately, else via a worker
-	:param job_name: can be used to name an enqueue call, which can be used to prevent duplicate calls
+	:param job_name: [DEPRECATED] can be used to name an enqueue call, which can be used to prevent duplicate calls
 	:param now: if now=True, the method is executed via frappe.call
 	:param kwargs: keyword arguments to be passed to the method
 	:param job_id: Assigning unique job id, which can be checked using `is_job_enqueued`
@@ -88,11 +88,12 @@ def enqueue(
 		# namespace job ids to sites
 		job_id = create_job_id(job_id)
 
+	if job_name:
+		deprecation_warning("Using enqueue with `job_name` is deprecated, use `job_id` instead.")
+
 	if not is_async and not frappe.flags.in_test:
-		print(
-			_(
-				"Using enqueue with is_async=False outside of tests is not recommended, use now=True instead."
-			)
+		deprecation_warning(
+			"Using enqueue with is_async=False outside of tests is not recommended, use now=True instead."
 		)
 
 	call_directly = now or (not is_async and not frappe.flags.in_test)
@@ -148,9 +149,7 @@ def enqueue(
 	)
 
 
-def enqueue_doc(
-	doctype, name=None, method=None, queue="default", timeout=300, now=False, **kwargs
-):
+def enqueue_doc(doctype, name=None, method=None, queue="default", timeout=300, now=False, **kwargs):
 	"""Enqueue a method to be run on a document"""
 	return enqueue(
 		"frappe.utils.background_jobs.run_doc_method",
@@ -237,7 +236,7 @@ def start_worker(
 	rq_password: str | None = None,
 	burst: bool = False,
 	strategy: Literal["round_robin", "random"] | None = None,
-) -> NoReturn | None:
+) -> None:
 	"""Wrapper to start rq worker. Connects to redis and monitors these queues."""
 	DEQUEUE_STRATEGIES = {"round_robin": RoundRobinWorker, "random": RandomWorker}
 
@@ -252,7 +251,6 @@ def start_worker(
 		if queue:
 			queue = [q.strip() for q in queue.split(",")]
 		queues = get_queue_list(queue, build_queue_name=True)
-		queue_name = queue and generate_qname(queue)
 
 	if os.environ.get("CI"):
 		setup_loghandlers("ERROR")
@@ -260,17 +258,16 @@ def start_worker(
 	set_niceness()
 	WorkerKlass = DEQUEUE_STRATEGIES.get(strategy, Worker)
 
-	with Connection(redis_connection):
-		logging_level = "INFO"
-		if quiet:
-			logging_level = "WARNING"
-		worker = WorkerKlass(queues, name=get_worker_name(queue_name))
-		worker.work(
-			logging_level=logging_level,
-			burst=burst,
-			date_format="%Y-%m-%d %H:%M:%S",
-			log_format="%(asctime)s,%(msecs)03d %(message)s",
-		)
+	logging_level = "INFO"
+	if quiet:
+		logging_level = "WARNING"
+	worker = WorkerKlass(queues, connection=redis_connection)
+	worker.work(
+		logging_level=logging_level,
+		burst=burst,
+		date_format="%Y-%m-%d %H:%M:%S",
+		log_format="%(asctime)s,%(msecs)03d %(message)s",
+	)
 
 
 def get_worker_name(queue):
@@ -279,9 +276,7 @@ def get_worker_name(queue):
 
 	if queue:
 		# hostname.pid is the default worker name
-		name = "{uuid}.{hostname}.{pid}.{queue}".format(
-			uuid=uuid4().hex, hostname=socket.gethostname(), pid=os.getpid(), queue=queue
-		)
+		name = f"{uuid4().hex}.{socket.gethostname()}.{os.getpid()}.{queue}"
 
 	return name
 
@@ -393,15 +388,18 @@ def get_redis_conn(username=None, password=None):
 			return _redis_queue_conn
 		else:
 			return RedisQueue.get_connection(**cred)
-	except (redis.exceptions.AuthenticationError, redis.exceptions.ResponseError):
+	except redis.exceptions.AuthenticationError:
 		log(
 			f'Wrong credentials used for {cred.username or "default user"}. '
 			"You can reset credentials using `bench create-rq-users` CLI and restart the server",
 			colour="red",
 		)
 		raise
-	except Exception:
-		log(f"Please make sure that Redis Queue runs @ {frappe.get_conf().redis_queue}", colour="red")
+	except Exception as e:
+		log(
+			f"Please make sure that Redis Queue runs @ {frappe.get_conf().redis_queue}. Redis reported error: {e!s}",
+			colour="red",
+		)
 		raise
 
 
@@ -479,7 +477,7 @@ def truncate_failed_registry(job, connection, type, value, traceback):
 	"""Ensures that number of failed jobs don't exceed specified limits."""
 	from frappe.utils import create_batch
 
-	conf = frappe.get_conf(site=job.kwargs.get("site"))
+	conf = frappe.conf if frappe.conf else frappe.get_conf(site=job.kwargs.get("site"))
 	limit = (conf.get("rq_failed_jobs_limit") or RQ_FAILED_JOBS_LIMIT) - 1
 
 	for queue in get_queues(connection=connection):

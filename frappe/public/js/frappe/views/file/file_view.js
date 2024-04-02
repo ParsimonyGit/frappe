@@ -233,6 +233,7 @@ frappe.views.FileView = class FileView extends frappe.views.ListView {
 		} else {
 			super.render();
 			this.render_header();
+			this.render_count();
 		}
 	}
 
@@ -364,8 +365,8 @@ frappe.views.FileView = class FileView extends frappe.views.ListView {
 					<input class="list-row-checkbox"
 						type="checkbox" data-name="${file.name}">
 				</span>
-				<span class="level-item  ellipsis" title="${file.file_name}">
-					<a class="ellipsis" href="${route_url}" title="${file.file_name}">
+				<span class="level-item  ellipsis" title="${frappe.utils.escape_html(file.file_name)}">
+					<a class="ellipsis" href="${route_url}" title="${frappe.utils.escape_html(file.file_name)}">
 						${file.subject_html}
 					</a>
 				</span>
