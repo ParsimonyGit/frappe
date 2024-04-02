@@ -19,7 +19,7 @@ from frappe.model.naming import set_new_name, validate_name
 from frappe.model.utils import is_virtual_doctype
 from frappe.model.workflow import set_workflow_state_on_action, validate_workflow
 from frappe.utils import cstr, date_diff, file_lock, flt, get_datetime_str, now
-from frappe.utils.data import get_absolute_url
+from frappe.utils.data import get_absolute_url, get_datetime, get_timedelta, getdate
 from frappe.utils.global_search import update_global_search
 
 
@@ -422,9 +422,25 @@ class Document(BaseDocument):
 		return getattr(self, "_doc_before_save", None)
 
 	def has_value_changed(self, fieldname):
-		"""Returns true if value is changed before and after saving"""
+		"""Return True if value has changed before and after saving."""
+		from datetime import date, datetime, timedelta
+
 		previous = self.get_doc_before_save()
-		return previous.get(fieldname) != self.get(fieldname) if previous else True
+
+		if not previous:
+			return True
+
+		previous_value = previous.get(fieldname)
+		current_value = self.get(fieldname)
+
+		if isinstance(previous_value, datetime):
+			current_value = get_datetime(current_value)
+		elif isinstance(previous_value, date):
+			current_value = getdate(current_value)
+		elif isinstance(previous_value, timedelta):
+			current_value = get_timedelta(current_value)
+
+		return previous_value != current_value
 
 	def set_new_name(self, force=False, set_name=None, set_child_names=True):
 		"""Calls `frappe.naming.set_new_name` for parent and child docs."""
@@ -524,6 +540,7 @@ class Document(BaseDocument):
 		self._validate_selects()
 		self._validate_non_negative()
 		self._validate_length()
+		self._fix_rating_value()
 		self._validate_code_fields()
 		self._sync_autoname_field()
 		self._extract_images_from_text_editor()
@@ -536,6 +553,7 @@ class Document(BaseDocument):
 			d._validate_selects()
 			d._validate_non_negative()
 			d._validate_length()
+			d._fix_rating_value()
 			d._validate_code_fields()
 			d._sync_autoname_field()
 			d._extract_images_from_text_editor()
@@ -569,6 +587,15 @@ class Document(BaseDocument):
 			if flt(self.get(df.fieldname)) < 0:
 				msg = get_msg(df)
 				frappe.throw(msg, frappe.NonNegativeError, title=_("Negative Value"))
+
+	def _fix_rating_value(self):
+		for field in self.meta.get("fields", {"fieldtype": "Rating"}):
+			value = self.get(field.fieldname)
+			if not isinstance(value, float):
+				value = flt(value)
+
+			# Make sure rating is between 0 and 1
+			self.set(field.fieldname, max(0, min(value, 1)))
 
 	def validate_workflow(self):
 		"""Validate if the workflow transition is valid"""
@@ -839,7 +866,7 @@ class Document(BaseDocument):
 		if not missing:
 			return
 
-		for fieldname, msg in missing:
+		for _fieldname, msg in missing:
 			msgprint(msg)
 
 		if frappe.flags.print_messages:
@@ -938,7 +965,7 @@ class Document(BaseDocument):
 			return
 
 		def _evaluate_alert(alert):
-			if not alert.name in self.flags.notifications_executed:
+			if alert.name not in self.flags.notifications_executed:
 				evaluate_alert(self, alert.name, alert.event)
 				self.flags.notifications_executed.append(alert.name)
 
@@ -1200,7 +1227,7 @@ class Document(BaseDocument):
 			doc_to_compare = frappe.get_doc(self.doctype, amended_from)
 
 		version = frappe.new_doc("Version")
-		if is_useful_diff := version.update_version_info(doc_to_compare, self):
+		if version.update_version_info(doc_to_compare, self):
 			version.insert(ignore_permissions=True)
 
 			if not frappe.flags.in_migrate:
@@ -1446,11 +1473,16 @@ class Document(BaseDocument):
 				title=_("Document Queued"),
 			)
 
+		enqueue_after_commit = kwargs.pop("enqueue_after_commit", None)
+		if enqueue_after_commit is None:
+			enqueue_after_commit = True
+
 		return enqueue(
 			"frappe.model.document.execute_action",
 			__doctype=self.doctype,
 			__name=self.name,
 			__action=action,
+			enqueue_after_commit=enqueue_after_commit,
 			**kwargs,
 		)
 
@@ -1463,7 +1495,7 @@ class Document(BaseDocument):
 		if file_lock.lock_exists(signature):
 			lock_exists = True
 			if timeout:
-				for i in range(timeout):
+				for _i in range(timeout):
 					time.sleep(1)
 					if not file_lock.lock_exists(signature):
 						lock_exists = False

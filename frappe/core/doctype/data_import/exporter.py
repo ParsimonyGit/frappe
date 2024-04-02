@@ -1,8 +1,6 @@
 # Copyright (c) 2019, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
 
-import typing
-
 import frappe
 from frappe import _
 from frappe.model import display_fieldtypes, no_value_fields
@@ -107,7 +105,7 @@ class Exporter:
 		fields = [df for df in fields if is_exportable(df)]
 
 		if "name" in fieldnames:
-			fields = [name_field] + fields
+			fields = [name_field, *fields]
 
 		return fields or []
 
@@ -165,7 +163,7 @@ class Exporter:
 		parent_data = frappe.db.get_list(
 			self.doctype,
 			filters=filters,
-			fields=["name"] + parent_fields,
+			fields=["name", *parent_fields],
 			limit_page_length=self.export_page_length,
 			order_by=order_by,
 			as_list=0,
@@ -178,9 +176,13 @@ class Exporter:
 				continue
 			child_table_df = self.meta.get_field(key)
 			child_table_doctype = child_table_df.options
-			child_fields = ["name", "idx", "parent", "parentfield"] + list(
-				{format_column_name(df) for df in self.fields if df.parent == child_table_doctype}
-			)
+			child_fields = [
+				"name",
+				"idx",
+				"parent",
+				"parentfield",
+				*list({format_column_name(df) for df in self.fields if df.parent == child_table_doctype}),
+			]
 			data = frappe.get_all(
 				child_table_doctype,
 				filters={
@@ -239,15 +241,9 @@ class Exporter:
 
 	def build_response(self):
 		if self.file_type == "CSV":
-			self.build_csv_response()
+			build_csv_response(self.get_csv_array_for_export(), _(self.doctype))
 		elif self.file_type == "Excel":
-			self.build_xlsx_response()
-
-	def build_csv_response(self):
-		build_csv_response(self.get_csv_array_for_export(), _(self.doctype))
-
-	def build_xlsx_response(self):
-		build_xlsx_response(self.get_csv_array_for_export(), _(self.doctype))
+			build_xlsx_response(self.get_csv_array_for_export(), _(self.doctype))
 
 	def group_children_data_by_parent(self, children_data: dict[str, list]):
 		return groupby_metric(children_data, key="parent")

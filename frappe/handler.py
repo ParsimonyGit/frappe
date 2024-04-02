@@ -12,6 +12,7 @@ import frappe.sessions
 import frappe.utils
 from frappe import _, is_whitelisted
 from frappe.core.doctype.server_script.server_script_utils import get_server_script_map
+from frappe.monitor import add_data_to_monitor
 from frappe.utils import cint
 from frappe.utils.csvutils import build_csv_response
 from frappe.utils.image import optimize_image
@@ -191,7 +192,8 @@ def upload_file():
 	optimize = frappe.form_dict.optimize
 	content = None
 
-	if frappe.form_dict.get("library_file_name", False):
+	if library_file := frappe.form_dict.get("library_file_name"):
+		frappe.has_permission("File", doc=library_file, throw=True)
 		doc = frappe.get_value(
 			"File",
 			frappe.form_dict.library_file_name,
@@ -330,6 +332,8 @@ def run_doc_method(method, docs=None, dt=None, dn=None, arg=None, args=None):
 		return
 
 	frappe.response["message"] = response
+
+	add_data_to_monitor(methodname=method)
 
 
 # for backwards compatibility
