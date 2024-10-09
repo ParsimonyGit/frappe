@@ -11,10 +11,12 @@
   "dt",
   "module",
   "label",
+  "placeholder",
   "label_help",
   "fieldname",
   "insert_after",
   "length",
+  "link_filters",
   "column_break_6",
   "fieldtype",
   "precision",
@@ -447,17 +449,28 @@
    "label": "Sort Options"
   },
   {
+   "fieldname": "link_filters",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Link Filters"
+  },
+  {
    "default": "0",
    "fieldname": "show_dashboard",
    "fieldtype": "Check",
    "label": "Show Dashboard"
+  },
+  {
+   "fieldname": "placeholder",
+   "fieldtype": "Data",
+   "label": "Placeholder"
   }
  ],
  "icon": "fa fa-glass",
  "idx": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-03-07 17:34:47.167183",
+ "modified": "2024-09-28 20:19:35.935720",
  "modified_by": "Administrator",
  "module": "Custom",
  "name": "Custom Field",

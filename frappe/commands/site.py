@@ -10,6 +10,7 @@ import click
 import frappe
 from frappe.commands import get_site, pass_context
 from frappe.exceptions import SiteNotSpecifiedError
+from frappe.utils import CallbackManager
 
 
 @click.command("new-site")
@@ -42,6 +43,11 @@ from frappe.exceptions import SiteNotSpecifiedError
 @click.option("--source-sql", "--source_sql", help="Initiate database with a SQL file")
 @click.option("--install-app", multiple=True, help="Install app after installation")
 @click.option("--set-default", is_flag=True, default=False, help="Set the new site as default site")
+@click.option(
+	"--setup-db/--no-setup-db",
+	default=True,
+	help="Create user and database in mariadb/postgres; only bootstrap if false",
+)
 def new_site(
 	site,
 	db_root_username=None,
@@ -58,6 +64,7 @@ def new_site(
 	db_host=None,
 	db_port=None,
 	set_default=False,
+	setup_db=True,
 ):
 	"Create a new site"
 	from frappe.installer import _new_site
@@ -79,6 +86,7 @@ def new_site(
 		db_type=db_type,
 		db_host=db_host,
 		db_port=db_port,
+		setup_db=setup_db,
 	)
 
 	if set_default:
@@ -243,7 +251,27 @@ def restore_backup(
 	admin_password,
 	force,
 ):
+	from pathlib import Path
+
 	from frappe.installer import _new_site, is_downgrade, is_partial, validate_database_sql
+
+	# Check for the backup file in the backup directory, as well as the main bench directory
+	dirs = (f"{site}/private/backups", "..")
+
+	# Try to resolve path to the file if we can't find it directly
+	if not Path(sql_file_path).exists():
+		click.secho(
+			f"File {sql_file_path} not found. Trying to check in alternative directories.", fg="yellow"
+		)
+		for dir in dirs:
+			potential_path = Path(dir) / Path(sql_file_path)
+			if potential_path.exists():
+				sql_file_path = str(potential_path.resolve())
+				click.secho(f"File {sql_file_path} found.", fg="green")
+				break
+		else:
+			click.secho(f"File {sql_file_path} not found.", fg="red")
+			sys.exit(1)
 
 	if is_partial(sql_file_path):
 		click.secho(
@@ -281,7 +309,7 @@ def restore_backup(
 		)
 
 	except Exception as err:
-		print(err.args[1])
+		print(err)
 		sys.exit(1)
 
 
@@ -301,7 +329,7 @@ def partial_restore(context, sql_file_path, verbose, encryption_key=None):
 	site = get_site(context)
 	verbose = context.verbose or verbose
 	frappe.init(site=site)
-	frappe.connect(site=site)
+	frappe.connect()
 	err, out = frappe.utils.execute_in_shell(f"file {sql_file_path}", check_exit_code=True)
 	if err:
 		click.secho("Failed to detect type of backup file", fg="red")
@@ -494,7 +522,8 @@ def add_db_index(context, doctype, column):
 
 	columns = column  # correct naming
 	for site in context.sites:
-		frappe.connect(site=site)
+		frappe.init(site=site)
+		frappe.connect()
 		try:
 			frappe.db.add_index(doctype, columns)
 			if len(columns) == 1:
@@ -524,7 +553,6 @@ def add_db_index(context, doctype, column):
 @pass_context
 def describe_database_table(context, doctype, column):
 	"""Describes various statistics about the table.
-
 	This is useful to build integration like
 	This includes:
 	1. Schema
@@ -533,12 +561,17 @@ def describe_database_table(context, doctype, column):
 	4. if column is specified then extra stats are generated for column:
 	        Distinct values count in column
 	"""
+	if doctype is None:
+		raise click.UsageError("--doctype <doctype> is required")
 	import json
 
+	from frappe.core.doctype.recorder.recorder import _fetch_table_stats
+
 	for site in context.sites:
-		frappe.connect(site=site)
+		frappe.init(site=site)
+		frappe.connect()
 		try:
-			data = _extract_table_stats(doctype, column)
+			data = _fetch_table_stats(doctype, column)
 			# NOTE: Do not print anything else in this to avoid clobbering the output.
 			print(json.dumps(data, indent=2))
 		finally:
@@ -546,68 +579,6 @@ def describe_database_table(context, doctype, column):
 
 	if not context.sites:
 		raise SiteNotSpecifiedError
-
-
-def _extract_table_stats(doctype: str, columns: list[str]) -> dict:
-	from frappe.utils import cint, cstr, get_table_name
-
-	def sql_bool(val):
-		return cstr(val).lower() in ("yes", "1", "true")
-
-	table = get_table_name(doctype, wrap_in_backticks=True)
-
-	schema = []
-	for field in frappe.db.sql(f"describe {table}", as_dict=True):
-		schema.append(
-			{
-				"column": field["Field"],
-				"type": field["Type"],
-				"is_nullable": sql_bool(field["Null"]),
-				"default": field["Default"],
-			}
-		)
-
-	def update_cardinality(column, value):
-		for col in schema:
-			if col["column"] == column:
-				col["cardinality"] = value
-				break
-
-	indexes = []
-	for idx in frappe.db.sql(f"show index from {table}", as_dict=True):
-		indexes.append(
-			{
-				"unique": not sql_bool(idx["Non_unique"]),
-				"cardinality": idx["Cardinality"],
-				"name": idx["Key_name"],
-				"sequence": idx["Seq_in_index"],
-				"nullable": sql_bool(idx["Null"]),
-				"column": idx["Column_name"],
-				"type": idx["Index_type"],
-			}
-		)
-		if idx["Seq_in_index"] == 1:
-			update_cardinality(idx["Column_name"], idx["Cardinality"])
-
-	total_rows = cint(
-		frappe.db.sql(
-			f"""select table_rows
-			   from  information_schema.tables
-			   where table_name = 'tab{doctype}'"""
-		)[0][0]
-	)
-
-	# fetch accurate cardinality for columns by query. WARN: This can take a lot of time.
-	for column in columns:
-		cardinality = frappe.db.sql(f"select count(distinct {column}) from {table}")[0][0]
-		update_cardinality(column, cardinality)
-
-	return {
-		"table_name": table.strip("`"),
-		"total_rows": total_rows,
-		"schema": schema,
-		"indexes": indexes,
-	}
 
 
 @click.command("add-system-manager")
@@ -622,7 +593,8 @@ def add_system_manager(context, email, first_name, last_name, send_welcome_email
 	import frappe.utils.user
 
 	for site in context.sites:
-		frappe.connect(site=site)
+		frappe.init(site=site)
+		frappe.connect()
 		try:
 			frappe.utils.user.add_system_manager(email, first_name, last_name, send_welcome_email, password)
 			frappe.db.commit()
@@ -648,7 +620,8 @@ def add_user_for_sites(
 	import frappe.utils.user
 
 	for site in context.sites:
-		frappe.connect(site=site)
+		frappe.init(site=site)
+		frappe.connect()
 		try:
 			add_new_user(email, first_name, last_name, user_type, send_welcome_email, password, add_role)
 			frappe.db.commit()
@@ -678,7 +651,6 @@ def disable_user(context, email):
 @pass_context
 def migrate(context, skip_failing=False, skip_search_index=False):
 	"Run patches, sync schema and rebuild files/translations"
-	from traceback_with_variables import activate_by_import
 
 	from frappe.migrate import SiteMigration
 
@@ -696,19 +668,11 @@ def migrate(context, skip_failing=False, skip_search_index=False):
 
 
 @click.command("migrate-to")
-@click.argument("frappe_provider")
-@pass_context
-def migrate_to(context, frappe_provider):
+def migrate_to():
 	"Migrates site to the specified provider"
 	from frappe.integrations.frappe_providers import migrate_to
 
-	for site in context.sites:
-		frappe.init(site=site)
-		frappe.connect()
-		migrate_to(site, frappe_provider)
-		frappe.destroy()
-	if not context.sites:
-		raise SiteNotSpecifiedError
+	migrate_to()
 
 
 @click.command("run-patch")
@@ -848,11 +812,13 @@ def backup(
 
 	verbose = verbose or context.verbose
 	exit_code = 0
+	rollback_callback = None
 
 	for site in context.sites:
 		try:
 			frappe.init(site=site)
 			frappe.connect()
+			rollback_callback = CallbackManager()
 			odb = scheduled_backup(
 				ignore_files=not with_files,
 				backup_path=backup_path,
@@ -867,12 +833,16 @@ def backup(
 				verbose=verbose,
 				force=True,
 				old_backup_metadata=old_backup_metadata,
+				rollback_callback=rollback_callback,
 			)
 		except Exception:
 			click.secho(
 				f"Backup failed for Site {site}. Database or site_config.json may be corrupted",
 				fg="red",
 			)
+			if rollback_callback:
+				rollback_callback.run()
+				rollback_callback = None
 			if verbose:
 				print(frappe.get_traceback(with_context=True))
 			exit_code = 1
@@ -903,6 +873,7 @@ def backup(
 @pass_context
 def remove_from_installed_apps(context, app):
 	"Remove app from site's installed-apps list"
+	ensure_app_not_frappe(app)
 	from frappe.installer import remove_from_installed_apps
 
 	for site in context.sites:
@@ -931,6 +902,7 @@ def remove_from_installed_apps(context, app):
 @pass_context
 def uninstall(context, app, dry_run, yes, no_backup, force):
 	"Remove app and linked modules from site"
+	ensure_app_not_frappe(app)
 	from frappe.installer import remove_app
 	from frappe.utils.synchronization import filelock
 
@@ -1169,6 +1141,10 @@ def browse(context, site, user=None):
 
 	sid = ""
 	if user:
+		if not frappe.db.exists("User", user):
+			click.echo(f"User {user} does not exist")
+			sys.exit(1)
+
 		if frappe.conf.developer_mode or user == "Administrator":
 			frappe.utils.set_request(path="/")
 			frappe.local.cookie_manager = CookieManager()
@@ -1503,6 +1479,18 @@ def add_new_user(
 		from frappe.utils.password import update_password
 
 		update_password(user=user.name, pwd=password)
+
+
+def ensure_app_not_frappe(app: str) -> None:
+	"""
+	Ensure that the app name passed is not 'frappe'
+
+	:param app: Name of the app
+	:return: Nothing
+	"""
+	if app == "frappe":
+		click.secho("You cannot remove or uninstall the app `frappe`", fg="red")
+		sys.exit(1)
 
 
 commands = [

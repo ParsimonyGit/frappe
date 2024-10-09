@@ -97,6 +97,10 @@ class MariaDBExceptionUtil:
 			and isinstance(e, pymysql.IntegrityError)
 		)
 
+	@staticmethod
+	def is_interface_error(e: pymysql.Error):
+		return isinstance(e, pymysql.InterfaceError)
+
 
 class MariaDBConnectionUtil:
 	def get_connection(self):
@@ -124,8 +128,8 @@ class MariaDBConnectionUtil:
 			"use_unicode": True,
 		}
 
-		if self.user not in (frappe.flags.root_login, "root"):
-			conn_settings["database"] = self.user
+		if self.cur_db_name:
+			conn_settings["database"] = self.cur_db_name
 
 		if self.port:
 			conn_settings["port"] = int(self.port)
@@ -199,7 +203,7 @@ class MariaDBDatabase(MariaDBConnectionUtil, MariaDBExceptionUtil, Database):
 			SUM(`data_length` + `index_length`) / 1024 / 1024 AS `database_size`
 			FROM information_schema.tables WHERE `table_schema` = %s GROUP BY `table_schema`
 			""",
-			self.db_name,
+			self.cur_db_name,
 			as_dict=True,
 		)
 
@@ -521,6 +525,9 @@ class MariaDBDatabase(MariaDBConnectionUtil, MariaDBExceptionUtil, Database):
 		from pymysql.cursors import SSCursor
 
 		try:
+			if not self._conn:
+				self.connect()
+
 			original_cursor = self._cursor
 			new_cursor = self._cursor = self._conn.cursor(SSCursor)
 			yield

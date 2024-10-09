@@ -4,6 +4,9 @@
 """build query for doclistview and return results"""
 
 import json
+from functools import lru_cache
+
+from sql_metadata import Parser
 
 import frappe
 import frappe.permissions
@@ -102,7 +105,10 @@ def validate_fields(data):
 	wildcard = update_wildcard_field_param(data)
 
 	for field in list(data.fields or []):
-		fieldname = extract_fieldname(field)
+		fieldname = extract_fieldnames(field)[0]
+		if not fieldname:
+			raise_invalid_field(fieldname)
+
 		if is_standard(fieldname):
 			continue
 
@@ -182,23 +188,21 @@ def is_standard(fieldname):
 	return fieldname in default_fields or fieldname in optional_fields or fieldname in child_table_fields
 
 
-def extract_fieldname(field):
-	for text in (",", "/*", "#"):
-		if text in field:
-			raise_invalid_field(field)
+@lru_cache
+def extract_fieldnames(field):
+	from frappe.database.schema import SPECIAL_CHAR_PATTERN
 
-	fieldname = field
-	for sep in (" as ", " AS "):
-		if sep in fieldname:
-			fieldname = fieldname.split(sep, 1)[0]
+	if not SPECIAL_CHAR_PATTERN.findall(field):
+		return [field]
 
-	# certain functions allowed, extract the fieldname from the function
-	if fieldname.startswith("count(") or fieldname.startswith("sum(") or fieldname.startswith("avg("):
-		if not fieldname.strip().endswith(")"):
-			raise_invalid_field(field)
-		fieldname = fieldname.split("(", 1)[1][:-1]
+	columns = Parser(f"select {field} from _dummy").columns
 
-	return fieldname
+	if not columns:
+		f = field.lower()
+		if ("count(" in f or "sum(" in f or "avg(" in f) and "*" in f:
+			return ["*"]
+
+	return columns
 
 
 def get_meta_and_docfield(fieldname, data):
@@ -212,7 +216,8 @@ def update_wildcard_field_param(data):
 	if (isinstance(data.fields, str) and data.fields == "*") or (
 		isinstance(data.fields, list | tuple) and len(data.fields) == 1 and data.fields[0] == "*"
 	):
-		data.fields = get_permitted_fields(data.doctype, parenttype=data.parenttype)
+		parent_type = data.parenttype or data.parent_doctype
+		data.fields = get_permitted_fields(data.doctype, parenttype=parent_type, ignore_virtual=True)
 		return True
 
 	return False
@@ -245,13 +250,13 @@ def get_parenttype_and_fieldname(field, data):
 		parts = field.split(".")
 		parenttype = parts[0]
 		fieldname = parts[1]
-		if parenttype.startswith("`tab"):
-			# `tabChild DocType`.`fieldname`
-			parenttype = parenttype[4:-1]
-			fieldname = fieldname.strip("`")
+		df = frappe.get_meta(data.doctype).get_field(parenttype)
+		if not df and parenttype.startswith("tab"):
+			# tabChild DocType.fieldname
+			parenttype = parenttype[3:]
 		else:
 			# tablefield.fieldname
-			parenttype = frappe.get_meta(data.doctype).get_field(parenttype).options
+			parenttype = df.options
 	else:
 		parenttype = data.doctype
 		fieldname = field.strip("`")
@@ -352,6 +357,7 @@ def export_query():
 	title = form_params.pop("title", doctype)
 	csv_params = pop_csv_params(form_params)
 	add_totals_row = 1 if form_params.pop("add_totals_row", None) == "1" else None
+	translate_values = 1 if form_params.pop("translate_values", None) == "1" else None
 
 	frappe.permissions.can_export(doctype, raise_exception=True)
 
@@ -371,8 +377,24 @@ def export_query():
 	if add_totals_row:
 		ret = append_totals_row(ret)
 
-	data = [[_("Sr"), *get_labels(db_query.fields, doctype)]]
-	data.extend([i + 1, *list(row)] for i, row in enumerate(ret))
+	fields_info = get_field_info(db_query.fields, doctype)
+
+	labels = [info["label"] for info in fields_info]
+	data = [[_("Sr"), *labels]]
+	processed_data = []
+
+	if frappe.local.lang == "en" or not translate_values:
+		data.extend([i + 1, *list(row)] for i, row in enumerate(ret))
+	elif translate_values:
+		translatable_fields = [field["translatable"] for field in fields_info]
+		processed_data = []
+		for i, row in enumerate(ret):
+			processed_row = [i + 1] + [
+				_(value) if translatable_fields[idx] else value for idx, value in enumerate(row)
+			]
+			processed_data.append(processed_row)
+			data.extend(processed_data)
+
 	data = handle_duration_fieldtype_values(doctype, data, db_query.fields)
 
 	if file_format_type == "CSV":
@@ -412,30 +434,55 @@ def append_totals_row(data):
 	return data
 
 
-def get_labels(fields, doctype):
-	"""get column labels based on column names"""
-	labels = []
+def get_field_info(fields, doctype):
+	"""Get column names, labels, field types, and translatable properties based on column names."""
+
+	field_info = []
 	for key in fields:
+		df = None
 		try:
 			parenttype, fieldname = parse_field(key)
 		except ValueError:
-			continue
+			# handles aggregate functions
+			parenttype = doctype
+			fieldname = key.split("(", 1)[0]
+			fieldname = fieldname[0].upper() + fieldname[1:]
 
 		parenttype = parenttype or doctype
 
 		if parenttype == doctype and fieldname == "name":
+			name = fieldname
 			label = _("ID", context="Label of name column in report")
+			fieldtype = "Data"
+			translatable = True
 		else:
 			df = frappe.get_meta(parenttype).get_field(fieldname)
-			label = _(df.label if df else fieldname.title())
+			if df and df.fieldtype in ("Data", "Select", "Small Text", "Text"):
+				name = df.name
+				label = _(df.label)
+				fieldtype = df.fieldtype
+				translatable = getattr(df, "translatable", False)
+			elif df and df.fieldtype == "Link" and frappe.get_meta(df.options).translated_doctype:
+				name = df.name
+				label = _(df.label)
+				fieldtype = df.fieldtype
+				translatable = True
+			else:
+				name = fieldname
+				label = _(df.label) if df else _(fieldname)
+				fieldtype = "Data"
+				translatable = False
+
 			if parenttype != doctype:
 				# If the column is from a child table, append the child doctype.
 				# For example, "Item Code (Sales Invoice Item)".
 				label += f" ({ _(parenttype) })"
 
-		labels.append(label)
+		field_info.append(
+			{"name": name, "label": label, "fieldtype": fieldtype, "translatable": translatable}
+		)
 
-	return labels
+	return field_info
 
 
 def handle_duration_fieldtype_values(doctype, data, fields):
@@ -509,6 +556,16 @@ def delete_bulk(doctype, items):
 	if undeleted_items and len(items) != len(undeleted_items):
 		frappe.clear_messages()
 		delete_bulk(doctype, undeleted_items)
+	elif undeleted_items:
+		frappe.msgprint(
+			_("Failed to delete {0} documents: {1}").format(len(undeleted_items), ", ".join(undeleted_items)),
+			realtime=True,
+			title=_("Bulk Operation Failed"),
+		)
+	else:
+		frappe.msgprint(
+			_("Deleted all documents successfully"), realtime=True, title=_("Bulk Operation Successful")
+		)
 
 
 @frappe.whitelist()
