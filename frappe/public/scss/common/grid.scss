@@ -1,9 +1,14 @@
+@mixin grid-focus() {
+	outline: none;
+	border: 1px solid var(--gray-400) !important;
+}
 .form-grid {
 	border: 1px solid var(--table-border-color);
 	border-radius: var(--border-radius-md);
 	color: var(--text-color);
-	min-height: 150px;
-	background-color: var(--subtle-accent);
+	&:focus-visible {
+		@include grid-focus();
+	}
 }
 
 .form-grid.error {
@@ -118,15 +123,8 @@
 .grid-body .data-row {
 	@include get_textstyle("sm", "regular");
 	color: var(--text-muted);
-	.row-check,
-	.row-index {
-		position: sticky;
-		left: 0;
-		background-color: var(--fg-color);
-		z-index: 1;
-	}
-	.row-index {
-		left: 31px;
+	button.col:focus-visible {
+		outline: 1px solid #c9c9c9;
 	}
 }
 
