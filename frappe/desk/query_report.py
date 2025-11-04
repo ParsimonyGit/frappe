@@ -170,7 +170,7 @@ def get_script(report_name):
 		script += f"\n\n//# sourceURL={scrub(report.name)}__custom"
 
 	if not script:
-		script = "frappe.query_reports['%s']={}" % report_name
+		script = "frappe.query_reports['{}']={{}}".format(report_name)
 
 	return {
 		"script": render_include(script),
@@ -410,7 +410,7 @@ def _export_query(form_params, csv_params, populate_response=True):
 	if not populate_response:
 		return report_name, file_extension, content
 
-	provide_binary_file(report_name, file_extension, content)
+	provide_binary_file(_(report_name), file_extension, content)
 
 
 def valid_report_name(report_name, suffix):
