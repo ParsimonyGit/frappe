@@ -1385,14 +1385,26 @@ def money_in_words(
 		out = _(main_currency, context="Currency") + " " + _("Zero")
 	# 0.XX
 	elif main == "0":
-		out = in_words(fraction, in_million).title() + " " + fraction_currency
+		out = in_words(fraction, in_million).title() + " " + _(fraction_currency, context="Currency")
 	else:
-		out = _(main_currency, context="Currency") + " " + in_words(main, in_million).title()
+		if main_currency == "DZD":
+			# Use Dinars for Algerian Compliance
+			out = in_words(main, in_million).title() + " " + _("Dinars", context="Currency")
+		else:
+			out = _(main_currency, context="Currency") + " " + in_words(main, in_million).title()
 		if cint(fraction):
 			out = (
-				out + " " + _("and") + " " + in_words(fraction, in_million).title() + " " + fraction_currency
+				out
+				+ " "
+				+ _("and")
+				+ " "
+				+ in_words(fraction, in_million).title()
+				+ " "
+				+ _(fraction_currency, context="Currency")
 			)
 
+	if main_currency == "DZD":
+		return out + "."
 	return out + " " + _("only.")
 
 
@@ -2006,7 +2018,7 @@ def _sanitize_column(column_name: str, db_type: str) -> str:
 	def _raise_exception():
 		frappe.throw(_("Invalid field name {0}").format(column_name), frappe.DataError)
 
-	regex = re.compile("^.*[,'();\n].*")
+	regex = re.compile("^.*[,'();\n`].*")
 	if "ifnull" in column_name:
 		if regex.match(column_name):
 			# to avoid and, or
@@ -2176,6 +2188,7 @@ def guess_date_format(date_string: str) -> str:
 		r"%y.%m.%d",
 		r"%d %b %Y",
 		r"%d %B %Y",
+		r"%d-%b-%Y",
 	]
 
 	TIME_FORMATS = [
